@@ -74,6 +74,13 @@ it('shares one Colyseus world, advances without viewers, protects metrics, and r
   );
   expect(one.state.id).toBe(two.state.id);
   expect(one.roomId).toBe(two.roomId);
+  await expect(client.create<TavernState>('tavern')).rejects.toThrow('The shared tavern already exists');
+  expect((await (await fetch(`${url}/api/room`)).json()).roomId).toBe(roomId);
+  const connectedVersion = one.state.version;
+  await waitUntil(
+    async () => one.state.version,
+    (version) => version > connectedVersion + 2,
+  );
   expect(one.state.inhabitants.size).toBe(15);
   expect(two.state.inhabitants.size).toBe(15);
   expect((await fetch(`${url}/api/metrics`)).status).toBe(401);

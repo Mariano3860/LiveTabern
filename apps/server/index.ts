@@ -1,4 +1,4 @@
-import { Server, Room, matchMaker } from '@colyseus/core';
+import { Server, Room, ServerError, matchMaker } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import express from 'express';
 import { existsSync } from 'node:fs';
@@ -22,6 +22,7 @@ let ticks = 0,
 class TavernRoom extends Room<{ state: TavernState }> {
   state = new TavernState();
   onCreate() {
+    if (projection) throw new ServerError(409, 'The shared tavern already exists; join the existing room.');
     this.autoDispose = false;
     this.patchRate = STEP_MS;
     this.maxClients = 150;

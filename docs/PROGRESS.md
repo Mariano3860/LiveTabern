@@ -51,3 +51,7 @@ The final dependency installation omits unused peer integrations and reports zer
 Production PostgreSQL and migrations, durable deployment supervision/backups, external HTTPS/WSS hosting, advanced story arcs/calendar, richer inventory/economy, bands and rehearsals, generative dialogue with quotas, detailed capability forecasting, and development-agent PR generation. External services and public deployment require their existing authorization boundaries.
 
 The original specification remains intact locally. English implementation and research documents are summaries; the above table makes partial cases explicit. No production service or paid provider was configured.
+
+### PR review correction
+
+A public matchmaking request could create a second room and replace the active projection, interrupting updates to existing spectators. The server now rejects additional tavern creation. The integration regression checks rejection, the unchanged canonical room ID, and continued updates to connected clients.
