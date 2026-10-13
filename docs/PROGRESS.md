@@ -101,3 +101,11 @@ The finite starter kit and single apprentice recipe are intentional limits. Rich
 TypeScript, lint, formatting, and the production build passed. The full 47-test simulation suite passed, followed by the additional crafted-instrument duet regression. All six browser tests passed together with stable source files, including reconnection and mobile layout; an earlier reconnection deadline failure passed on isolated repeat before the complete rerun. The workshop and subsequent lute-performance captures were visually inspected.
 
 PR review strengthened snapshot validation to require exactly one starter kit after delivery, added a completion interruption outside the workshop, and corrected singular material copy. CI passed the full 48-test suite and six browser tests before these review refinements; the updated head is checked again before merging.
+
+### Chronicle request cancellation — P1-007
+
+Browser reproduction confirmed that an archive response arriving after a filter change replaced the new search cursor: an unfiltered request starting before sequence 3,107 returned cursor 7, and the subsequent Pip request incorrectly started before 7. The client now aborts old requests when filters change or the view unmounts and guards record, cursor, error, and loading updates by request identity. A new search can proceed immediately, and an aborted request cannot clear its loading indicator.
+
+Browser regressions delay both old and current responses, change the traveler and category filters, verify the new request's parameters and subsequent confirmed cursor, and preserve visible errors and successful retry for the active request. The archive API is mocked only for controlled timing; the existing server history and real world remain unchanged. No dependency or new endpoint was introduced.
+
+TypeScript, lint, formatting, and the production build passed. The three archive regressions and the three existing tavern browser checks passed together, including real spectator reconnection and narrow layout. CI runs the complete simulation and browser suites for the PR before merging.
