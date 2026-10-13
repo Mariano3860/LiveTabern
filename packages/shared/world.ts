@@ -98,6 +98,7 @@ export interface World {
   consumedAle: number;
   suppliedAle: number;
   supplyDay: number;
+  economyHour: number;
   opportunities: Opportunity[];
   demands: CapabilityDemand[];
   directorNext: number;
