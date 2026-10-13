@@ -220,6 +220,9 @@ function Tavern({ reduced }: { reduced: boolean }) {
       <Box p={[6.2, 0.5, 4.3]} s={[1.6, 0.9, 0.65]} c="#675038" />
       <Box p={[6.2, 1.01, 4.3]} s={[1.7, 0.14, 0.72]} c="#a07546" />
       <Box p={[6.2, 0.72, 3.96]} s={[0.18, 0.18, 0.04]} c="#bb9c56" />
+      <Box p={[6.15, 1.12, 4.25]} s={[0.7, 0.06, 0.3]} c="#c79558" />
+      <Box p={[6.65, 1.16, 4.3]} s={[0.07, 0.08, 0.4]} c="#493225" />
+      <Box p={[6.65, 1.19, 4.13]} s={[0.22, 0.1, 0.1]} c="#7b8588" />
       <group position={[0, 3.9, -0.8]}>
         <Round p={[0, 0, 0]} s={[1.05, 0.07, 1.05]} c="#44382d" />
         <Box p={[0, 0.6, 0]} s={[0.07, 1.2, 0.07]} c="#55412d" />
@@ -278,6 +281,8 @@ function Person({
       if (partner)
         facing = Math.atan2(partner.position[0] - npc.position[0], partner.position[1] - npc.position[1]);
     } else if (npc.action === 'play_music') facing = 0.15;
+    else if (npc.action === 'craft_instrument')
+      facing = Math.atan2(6.2 - npc.position[0], 4.3 - npc.position[1]);
     group.current.rotation.y = facing;
     const dancing = performing && npc.action === 'dance',
       seated = performing && npc.action === 'rest' && npc.id !== 'npc-1';
@@ -297,7 +302,7 @@ function Person({
       rightLeg.current.rotation.x = seated ? -1.1 : !reduced && moving ? -Math.sin(t * 7) * 0.45 : 0;
     if (leftArm.current)
       leftArm.current.rotation.x =
-        performing && npc.action === 'play_music'
+        performing && ['play_music', 'craft_instrument'].includes(npc.action)
           ? -0.7
           : dancing
             ? -1.8
@@ -308,15 +313,19 @@ function Person({
       rightArm.current.rotation.x =
         performing && npc.action === 'drink'
           ? -1.3
-          : performing && npc.action === 'trade'
-            ? -0.8
-            : !reduced && performing && ['chat', 'play_music'].includes(npc.action)
-              ? -0.45 + Math.sin(t * 4) * 0.25
-              : dancing
-                ? -1.8
-                : !reduced && moving
-                  ? Math.sin(t * 7) * 0.35
-                  : 0;
+          : performing && npc.action === 'craft_instrument'
+            ? reduced
+              ? -1
+              : -1 + Math.sin(t * 7) * 0.25
+            : performing && npc.action === 'trade'
+              ? -0.8
+              : !reduced && performing && ['chat', 'play_music'].includes(npc.action)
+                ? -0.45 + Math.sin(t * 4) * 0.25
+                : dancing
+                  ? -1.8
+                  : !reduced && moving
+                    ? Math.sin(t * 7) * 0.35
+                    : 0;
   });
   return (
     <group
@@ -366,6 +375,12 @@ function Person({
           {performing && npc.action === 'drink' && <Mug p={[0, -0.4, 0.08]} />}{' '}
           {performing && npc.action === 'trade' && (
             <Round p={[0, -0.4, 0.08]} s={[0.07, 0.2, 0.07]} c="#75a884" />
+          )}
+          {performing && npc.action === 'craft_instrument' && (
+            <group position={[0, -0.4, 0.09]}>
+              <Box p={[0, 0, 0]} s={[0.06, 0.28, 0.06]} c="#67452b" />
+              <Box p={[0, -0.13, 0]} s={[0.2, 0.1, 0.1]} c="#939894" />
+            </group>
           )}
         </group>
         {performing && npc.action === 'play_music' && npc.instrument === 'lute' && (

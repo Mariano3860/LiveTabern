@@ -6,7 +6,17 @@ import {
   type World,
   type WorldEvent,
 } from '../shared/world';
-import { barSpots, danceSpots, distance, hearthSpots, isWalkable, seats, stageSpots } from '../shared/layout';
+import {
+  barSpots,
+  danceSpots,
+  distance,
+  hearthSpots,
+  isWalkable,
+  seats,
+  stageSpots,
+  workbenchSpot,
+} from '../shared/layout';
+export const CRAFT_DURATION = 12000;
 export interface Navigation {
   path(start: Point, end: Point): Point[];
 }
@@ -60,6 +70,7 @@ export function createWorld(now: number, seed = 1729): World {
     suppliedAle: 240,
     supplyDay: Math.floor(now / 86400000),
     economyHour: Math.floor(now / 3600000),
+    workshop: { wood: 0, strings: 0, craftedLutes: 0, suppliedWood: 0, suppliedStrings: 0, delivered: false },
     opportunities: [],
     demands: [],
     directorNext: now + 15000,
@@ -155,6 +166,17 @@ export function demand(world: World, npcId: string, id: string, reason: string) 
 export function canExecute(world: World, npc: Inhabitant, action: Action, partnerId?: string): string | null {
   if (!actions.includes(action) || world.disabledActions.includes(action)) return 'Capability is unavailable';
   const partner = world.inhabitants.find((n) => n.id === partnerId);
+  if (action === 'craft_instrument') {
+    const unavailable = craftPrerequisite(world, npc);
+    if (unavailable) return unavailable;
+    if (
+      npc.plan?.action !== action ||
+      npc.plan.phase !== 'performing' ||
+      npc.plan.until === 0 ||
+      world.time < npc.plan.until
+    )
+      return 'Must finish working at the bench';
+  }
   if (action === 'drink') {
     if (npc.coins < 1 || world.stock < 1) return 'No coins or ale available';
     if (!barSpots.some((p) => distance(npc.position, p) < 0.55)) return 'Must reach the bar';
@@ -180,6 +202,14 @@ export function canExecute(world: World, npc: Inhabitant, action: Action, partne
     return 'There must be live music';
   return null;
 }
+function craftPrerequisite(world: World, npc: Inhabitant): string | null {
+  if (npc.role !== 'Apprentice' || npc.instrument !== 'none')
+    return 'Only an apprentice without an instrument needs this kit';
+  if (npc.energy < 30) return 'Not enough energy';
+  if (world.workshop.wood < 3 || world.workshop.strings < 1) return 'Missing wood or strings';
+  if (distance(npc.position, workbenchSpot) >= 0.55) return 'Must reach the workbench';
+  return null;
+}
 export function executeAction(
   world: World,
   npcId: string,
@@ -193,6 +223,7 @@ export function executeAction(
     !npc ||
     (commandNumber && Number(commandNumber[1]) <= npc.lastCommand) ||
     world.completedCommands.includes(commandId) ||
+    (action === 'craft_instrument' && npc.plan?.id !== commandId) ||
     canExecute(world, npc, action, partnerId)
   )
     return false;
@@ -281,6 +312,27 @@ export function executeAction(
         ? `${npc.name} sings “The Road Leads Home” by the hearthlight.`
         : `${npc.name} fills the common room with a wandering lute melody.`,
     );
+  } else if (action === 'craft_instrument') {
+    world.workshop.wood -= 3;
+    world.workshop.strings--;
+    world.workshop.craftedLutes++;
+    npc.instrument = 'lute';
+    npc.energy -= 10;
+    npc.mood = Math.min(100, npc.mood + 10);
+    const wish = world.demands.find((d) => d.id === action);
+    if (wish) {
+      wish.fulfilled = true;
+      wish.priority = 0;
+      wish.lastSeen = world.time;
+      wish.reason = `${npc.name} built a lute and can now join the musicians.`;
+    }
+    emit(
+      world,
+      action,
+      [npc.id],
+      `${npc.name} finishes a handmade lute.`,
+      '3 pieces of wood and 1 set of strings consumed; 1 lute created after twelve seconds of work.',
+    );
   } else if (action === 'dance') {
     npc.energy = Math.max(0, npc.energy - 2);
     npc.mood = Math.min(100, npc.mood + 5);
@@ -310,6 +362,7 @@ export function chooseAction(npc: Inhabitant, novelty: number, disabled: Action[
     chat: (npc.socialNeed / 100) * (0.5 + npc.sociability),
     trade: npc.inventory.tonic === 0 && npc.coins > 3 ? 0.35 : -1,
     wander: 0.3,
+    craft_instrument: npc.role === 'Apprentice' && npc.instrument === 'none' && npc.energy >= 31 ? 1.05 : -1,
   };
   // Bounded novelty varies choices without replacing needs and stable personality.
   return actions
@@ -343,6 +396,8 @@ function planAction(world: World, npc: Inhabitant, navigation: Navigation) {
     destination = [3.3, -5.1];
   } else if (action === 'drink') destination = available(world, barSpots, npc);
   else if (action === 'play_music') destination = available(world, stageSpots, npc);
+  else if (action === 'craft_instrument' && world.workshop.wood >= 3 && world.workshop.strings >= 1)
+    destination = available(world, [workbenchSpot], npc);
   else if (action === 'dance') {
     if (
       world.inhabitants.some(
@@ -540,7 +595,7 @@ function updateDuets(world: World) {
         group.startedAt = world.time;
         group.until = world.time + 32000;
         group.performances++;
-        group.outcome = 'Voice and strings share the same song.';
+        group.outcome = 'Two musicians share the same song.';
         for (const [i, n] of members.entries()) {
           const partner = members[1 - i];
           n.relationships[partner.id] = Math.min(100, (n.relationships[partner.id] ?? 0) + 4);
@@ -620,11 +675,30 @@ export function tickWorld(world: World, now: number, navigation: Navigation): Wo
     sequence = world.sequence;
   world.time = now;
   world.version++;
+  if (!world.workshop.delivered) {
+    Object.assign(world.workshop, {
+      wood: 3,
+      strings: 1,
+      suppliedWood: 3,
+      suppliedStrings: 1,
+      delivered: true,
+    });
+    emit(
+      world,
+      'system',
+      [],
+      'The workshop receives three pieces of wood and a set of lute strings.',
+      'A single starter kit was delivered; material provenance recorded.',
+    );
+  }
   if (now >= world.musicNext && !world.disabledActions.includes('play_music')) {
     const musicians = world.inhabitants.filter(
       (n) => n.instrument !== 'none' && !n.plan && n.energy >= 45 && n.thirst <= 80,
     );
-    if (musicians.length >= 2) inviteDuet(world, musicians[0].id, musicians[1].id, navigation);
+    if (musicians.length >= 2) {
+      const offset = musicians.length > 2 ? Math.floor(random(world) * musicians.length) : 0;
+      inviteDuet(world, musicians[offset].id, musicians[(offset + 1) % musicians.length].id, navigation);
+    }
   }
   const hour = Math.floor(now / 3600000);
   if (hour > world.economyHour) {
@@ -669,6 +743,14 @@ export function tickWorld(world: World, now: number, navigation: Navigation): Wo
     );
     const plan = npc.plan;
     if (plan && world.disabledActions.includes(plan.action)) {
+      if (plan.action === 'craft_instrument' && plan.until > 0 && !plan.applied)
+        emit(
+          world,
+          'story',
+          [npc.id],
+          `${npc.name} puts the unfinished lute aside.`,
+          'Crafting was disabled; no materials were consumed.',
+        );
       npc.plan = null;
       npc.nextDecision = now + 2000;
       continue;
@@ -699,6 +781,31 @@ export function tickWorld(world: World, now: number, navigation: Navigation): Wo
     }
     if (plan.phase === 'performing') {
       if (world.musicGroups.some((g) => g.status !== 'resting' && g.members.includes(npc.id))) continue;
+      if (plan.action === 'craft_instrument' && !plan.applied) {
+        if (craftPrerequisite(world, npc)) {
+          emit(
+            world,
+            'story',
+            [npc.id],
+            `${npc.name} cannot continue the lute.`,
+            'The workshop prerequisites are no longer satisfied; no materials were consumed.',
+          );
+          npc.plan = null;
+          npc.nextDecision = now + 4000;
+          continue;
+        }
+        if (plan.until === 0) {
+          plan.until = now + CRAFT_DURATION;
+          emit(
+            world,
+            'craft_instrument',
+            [npc.id],
+            `${npc.name} begins shaping a lute at the workbench.`,
+            'Work started; the instrument and materials have not changed yet.',
+          );
+        }
+        if (now < plan.until) continue;
+      }
       if (!plan.applied) {
         if (!executeAction(world, npc.id, plan.action, plan.id, plan.targetId)) {
           npc.plan = null;
@@ -706,7 +813,15 @@ export function tickWorld(world: World, now: number, navigation: Navigation): Wo
           continue;
         }
         plan.applied = true;
-        plan.until = now + (plan.action === 'play_music' ? 32000 : plan.action === 'rest' ? 16000 : 8000);
+        plan.until =
+          now +
+          (plan.action === 'craft_instrument'
+            ? 0
+            : plan.action === 'play_music'
+              ? 32000
+              : plan.action === 'rest'
+                ? 16000
+                : 8000);
       }
       if (now >= plan.until) {
         npc.plan = null;
@@ -728,12 +843,16 @@ export function tickWorld(world: World, now: number, navigation: Navigation): Wo
       candidate.energy > 40 &&
         random(world) < (opportunity.kind === 'music' ? candidate.creativity : candidate.sociability),
     );
-    if (opportunity.kind === 'music')
+    if (
+      opportunity.kind === 'music' &&
+      world.inhabitants[10].instrument === 'none' &&
+      world.disabledActions.includes('craft_instrument')
+    )
       demand(
         world,
         'npc-11',
         'craft_instrument',
-        'Pip would like to join the musicians, but instrument crafting has not been implemented.',
+        'Pip would like to join the musicians, but instrument crafting is currently disabled.',
       );
     world.directorNext = now + 120000;
   }

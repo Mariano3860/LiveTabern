@@ -151,7 +151,7 @@ it('shares one Colyseus world, advances without viewers, protects metrics, and r
   expect(catalogue.available.find((c: { id: string }) => c.id === 'trade').enabled).toBe(false);
   expect(
     (
-      await fetch(`${url}/api/admin/capabilities/craft_instrument`, {
+      await fetch(`${url}/api/admin/capabilities/craft_fiddle`, {
         method: 'POST',
         headers: auth,
         body: JSON.stringify({ enabled: true }),

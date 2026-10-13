@@ -1,4 +1,13 @@
-export const actions = ['wander', 'rest', 'drink', 'chat', 'trade', 'play_music', 'dance'] as const;
+export const actions = [
+  'wander',
+  'rest',
+  'drink',
+  'chat',
+  'trade',
+  'play_music',
+  'dance',
+  'craft_instrument',
+] as const;
 export type Action = (typeof actions)[number];
 export type Point = [number, number];
 export type Category = Action | 'story' | 'system' | 'capability';
@@ -69,6 +78,15 @@ export interface CapabilityDemand {
   reason: string;
   priority: number;
   lastSeen: number;
+  fulfilled?: boolean;
+}
+export interface Workshop {
+  wood: number;
+  strings: number;
+  craftedLutes: number;
+  suppliedWood: number;
+  suppliedStrings: number;
+  delivered: boolean;
 }
 export interface MusicGroup {
   id: string;
@@ -108,6 +126,7 @@ export interface World {
   disabledActions: Action[];
   musicGroups: MusicGroup[];
   musicNext: number;
+  workshop: Workshop;
 }
 export type PublicInhabitant = Pick<
   Inhabitant,
@@ -135,6 +154,7 @@ export interface PublicWorld {
   demands: CapabilityDemand[];
   stock: number;
   musicGroups: PublicMusicGroup[];
+  workshop: Workshop;
 }
 export interface Snapshot {
   world: PublicWorld;
@@ -155,7 +175,9 @@ export const capabilityCatalogue = actions.map((id) => ({
           ? ['at_stage', 'instrument_or_voice']
           : id === 'dance'
             ? ['live_music']
-            : [],
+            : id === 'craft_instrument'
+              ? ['apprentice', 'at_workbench', 'wood', 'strings', 'energy', 'completed_work']
+              : [],
 }));
 export function publicWorld(world: World): PublicWorld {
   return {
@@ -164,6 +186,7 @@ export function publicWorld(world: World): PublicWorld {
     time: world.time,
     startedAt: world.startedAt,
     stock: world.stock,
+    workshop: { ...world.workshop },
     inhabitants: world.inhabitants.map((n) => ({
       id: n.id,
       name: n.name,
@@ -177,7 +200,12 @@ export function publicWorld(world: World): PublicWorld {
       energy: n.energy,
       mood: n.mood,
       instrument: n.instrument,
-      phase: n.plan?.phase === 'performing' && !n.plan.applied ? 'idle' : (n.plan?.phase ?? 'idle'),
+      phase:
+        n.plan?.phase === 'performing' &&
+        !n.plan.applied &&
+        !(n.action === 'craft_instrument' && n.plan.until > 0)
+          ? 'idle'
+          : (n.plan?.phase ?? 'idle'),
       partnerId: n.plan?.targetId,
       until: n.plan?.until ?? 0,
     })),

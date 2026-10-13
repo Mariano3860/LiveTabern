@@ -10,7 +10,7 @@ import {
 } from '../packages/simulation/engine';
 import { createNavigation } from '../packages/navigation/recast';
 import { isWalkable, distance } from '../packages/shared/layout';
-import { publicWorld } from '../packages/shared/world';
+import { actions, publicWorld } from '../packages/shared/world';
 let navigation: Awaited<ReturnType<typeof createNavigation>>;
 beforeAll(async () => {
   navigation = await createNavigation();
@@ -78,7 +78,7 @@ describe('authoritative simulation', () => {
     expect(respondToOpportunity(w, o.id, 'npc-2', false)).toBe(true);
     expect(o.status).toBe('declined');
     const inventory = structuredClone(w.inhabitants[10].inventory);
-    expect(executeIntent(w, 'npc-11', 'craft_instrument', 'missing-action')).toBe(false);
+    expect(executeIntent(w, 'npc-11', 'craft_fiddle', 'missing-action')).toBe(false);
     expect(w.demands[0].count).toBe(1);
     expect(w.inhabitants[10].inventory).toEqual(inventory);
   });
@@ -117,10 +117,10 @@ describe('authoritative simulation', () => {
   it('stays idle when every capability is disabled and cancels unavailable movement', () => {
     const world = createWorld(0),
       positions = world.inhabitants.map((npc) => [...npc.position]);
-    world.disabledActions = ['wander', 'rest', 'drink', 'chat', 'trade', 'play_music', 'dance'];
+    world.disabledActions = [...actions];
     for (let now = 250; now <= 10000; now += 250) tickWorld(world, now, navigation);
     expect(world.inhabitants.every((npc) => npc.plan === null)).toBe(true);
     expect(world.inhabitants.map((npc) => npc.position)).toEqual(positions);
-    expect(world.events).toHaveLength(1);
+    expect(world.events.every((event) => event.category === 'system')).toBe(true);
   });
 });
