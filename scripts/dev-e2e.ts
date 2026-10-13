@@ -5,6 +5,7 @@ import type { ChildProcess } from 'node:child_process';
 
 const root = process.cwd();
 const localDir = resolve(root, '.local');
+const apiPort = 3002;
 mkdirSync(localDir, { recursive: true });
 
 const server = spawn(
@@ -14,7 +15,7 @@ const server = spawn(
     cwd: root,
     env: {
       ...process.env,
-      PORT: '3002',
+      PORT: String(apiPort),
       WORLD_DB: resolve(localDir, `e2e-visual-${process.pid}.sqlite`),
       DIRECTOR_MODE: 'off',
     },
@@ -51,7 +52,11 @@ try {
   web = spawn(
     process.execPath,
     [resolve(root, 'node_modules/vite/bin/vite.js'), '--config', 'vite.e2e.config.ts'],
-    { cwd: root, env: process.env, stdio: 'inherit' },
+    {
+      cwd: root,
+      env: { ...process.env, VITE_WORLD_URL: `http://127.0.0.1:${apiPort}` },
+      stdio: 'inherit',
+    },
   );
   const ended = await Promise.race(
     [server, web].map(
