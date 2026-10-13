@@ -12,9 +12,10 @@
     "test": "vitest run",
     "start": "tsx --env-file-if-exists=.env apps/server/index.ts",
     "test:e2e": "playwright test",
-    "lint": "eslint apps packages tests *.ts",
-    "format": "prettier --write apps packages tests *.ts *.js *.json README.md AGENTS.md docs planning .agents/skills/tavern-capability/SKILL.md",
-    "format:check": "prettier --check apps packages tests *.ts *.js *.json README.md AGENTS.md docs planning .agents/skills/tavern-capability/SKILL.md"
+    "backup": "tsx --env-file-if-exists=.env scripts/backup-world.ts",
+    "lint": "eslint apps packages tests scripts *.ts",
+    "format": "prettier --write apps packages tests scripts *.ts *.js *.json README.md AGENTS.md docs planning .agents/skills/tavern-capability/SKILL.md",
+    "format:check": "prettier --check apps packages tests scripts *.ts *.js *.json README.md AGENTS.md docs planning .agents/skills/tavern-capability/SKILL.md"
   },
   "dependencies": {
     "@colyseus/core": "^0.18.18",

@@ -109,7 +109,7 @@
     {
       "id": "P1-005",
       "title": "Add verified local backups and world diagnostics",
-      "status": "todo",
+      "status": "done",
       "dependencies": ["P1-004"],
       "acceptance": [
         "Create a consistent backup of a running SQLite world",

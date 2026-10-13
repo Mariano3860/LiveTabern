@@ -142,6 +142,8 @@ const game = new Server({
         aiMonthlyLimit: aiConfig.monthlyCalls,
         aiLastStatus: aiMetrics.lastStatus,
         aiCircuitOpen: aiMetrics.circuitOpen,
+        snapshotAgeMs: Math.max(0, Date.now() - world.time),
+        publicSnapshotBytes: Buffer.byteLength(JSON.stringify(publicWorld(world))),
         directorEnabled: world.directorEnabled,
         persistence: 'sqlite-local',
       });

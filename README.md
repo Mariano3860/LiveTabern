@@ -25,6 +25,8 @@ Willing musicians can form a persistent duet, walk to separate places on the sta
 
 The local world is stored in `.local/world.sqlite`, outside Git. Restarting restores confirmed progress, including identities, inventories, memories, and relationships. Recovery replays at most five minutes of downtime and explicitly records longer skipped intervals; the server must be running for continuous simulation.
 
+Run `npm run backup` to create and verify a consistent local backup while the server is running. Use [the backup and restore guide](docs/BACKUPS.md) to check a copy or restore into a separate path. Existing files are never overwritten by these commands.
+
 For protected administration, copy `.env.example` to `.env`, set a long random `ADMIN_TOKEN`, and restart the server. Open http://127.0.0.1:5173/admin and enter that token. Metrics and director/capability controls require it. Tokens are not stored in browser local storage or URLs.
 
 To exercise the optional chronicler boundary, set `AI_MODE=mock` and restart, then use **Preview annotation** in administration. This is a local template over confirmed public events, not a model call. It never changes the world. `AI_DAILY_CALLS` and `AI_MONTHLY_CALLS` limit attempts; reservations survive restart in the world database. Defaults allow 20 daily / 200 monthly attempts. Spend limits remain zero. `AI_MODE=off` is the default, and no paid provider is connected. See [the gateway decision](docs/ADR/002-optional-narrative-gateway.md) for timeout, caching, failure, and budget behavior.

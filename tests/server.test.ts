@@ -201,6 +201,8 @@ it('shares one Colyseus world, advances without viewers, protects metrics, and r
   const aiMetrics = await (await fetch(`${url}/api/metrics`, { headers: auth })).json();
   expect(aiMetrics.aiMode).toBe('mock');
   expect(aiMetrics.aiCalls).toBe(1);
+  expect(aiMetrics.snapshotAgeMs).toBeGreaterThanOrEqual(0);
+  expect(aiMetrics.publicSnapshotBytes).toBeGreaterThan(1000);
   const observed = await (await fetch(`${url}/api/world`)).json();
   expect(observed.events.some((event: { text: string }) => event.text === preview.annotation.caption)).toBe(
     false,
