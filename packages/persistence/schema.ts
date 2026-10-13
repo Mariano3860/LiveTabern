@@ -71,6 +71,7 @@ export const worldSchema = z
     consumedAle: z.number().int().nonnegative(),
     suppliedAle: z.number().int().nonnegative(),
     supplyDay: z.number().int(),
+    economyHour: z.number().int().default(-1),
     opportunities: z.array(
       z.object({
         id: z.string(),

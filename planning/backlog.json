@@ -85,7 +85,7 @@
     {
       "id": "P1-003",
       "title": "Sustain tavern needs and its closed economy across many days",
-      "status": "todo",
+      "status": "done",
       "dependencies": ["P1-002"],
       "acceptance": [
         "Keep purchases, social activity, and music occurring after the initial days",

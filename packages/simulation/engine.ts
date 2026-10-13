@@ -59,6 +59,7 @@ export function createWorld(now: number, seed = 1729): World {
     consumedAle: 0,
     suppliedAle: 240,
     supplyDay: Math.floor(now / 86400000),
+    economyHour: Math.floor(now / 3600000),
     opportunities: [],
     demands: [],
     directorNext: now + 15000,
@@ -625,15 +626,39 @@ export function tickWorld(world: World, now: number, navigation: Navigation): Wo
     );
     if (musicians.length >= 2) inviteDuet(world, musicians[0].id, musicians[1].id, navigation);
   }
-  const day = Math.floor(now / 86400000);
-  if (day > world.supplyDay) {
-    world.supplyDay = day;
-    world.stock += 240;
-    world.suppliedAle += 240;
-    emit(world, 'system', ['npc-1'], 'The morning delivery brings 240 servings of fresh ale.');
+  const hour = Math.floor(now / 3600000);
+  if (hour > world.economyHour) {
+    world.economyHour = hour;
+    world.supplyDay = Math.floor(now / 86400000);
+    const delivery = Math.max(0, 240 - world.stock);
+    if (delivery) {
+      world.stock += delivery;
+      world.suppliedAle += delivery;
+      emit(
+        world,
+        'system',
+        ['npc-1'],
+        `A fresh cask arrives with ${delivery} servings of ale.`,
+        'Hourly delivery fills the reserve to 240 servings; stock and provenance updated together.',
+      );
+    }
+    const host = world.inhabitants[0],
+      regulars = world.inhabitants.slice(1);
+    const share = Math.min(3, Math.floor(Math.max(0, host.coins - 4) / regulars.length));
+    if (share > 0) {
+      host.coins -= share * regulars.length;
+      for (const npc of regulars) npc.coins += share;
+      emit(
+        world,
+        'system',
+        [host.id],
+        `Borin shares ${share * regulars.length} coins from the tavern's takings with the regulars.`,
+        `${share} coins transferred to each of ${regulars.length} regulars; no new money created.`,
+      );
+    }
   }
   for (const npc of world.inhabitants) {
-    npc.thirst = Math.min(100, npc.thirst + elapsed * 0.18);
+    npc.thirst = Math.min(100, npc.thirst + elapsed * 0.035);
     npc.socialNeed = Math.min(100, npc.socialNeed + elapsed * 0.13);
     npc.energy = Math.max(
       0,
