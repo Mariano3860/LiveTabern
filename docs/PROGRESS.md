@@ -31,20 +31,20 @@ The final dependency installation omits unused peer integrations and reports zer
 
 ### Local acceptance mapping
 
-| Original case               | Evidence / limit                                                                                            |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| AT-01 Persistent identity   | Store reopen test and actual server restart test                                                            |
-| AT-02 Shared world          | Two Colyseus clients and two browser contexts                                                               |
-| AT-03 Autonomous progress   | Server test with zero connected clients                                                                     |
-| AT-04 Economy               | Transaction regression tests and seven-day conservation checks                                              |
-| AT-05 Non-coercive director | Explicit rejection test and persisted opportunity outcomes                                                  |
-| AT-06 Missing capability    | Unsupported intent records demand without inventory effects                                                 |
-| AT-07 AI off                | No external AI adapter is configured or invoked; metrics show zero calls                                    |
-| AT-08 Exhausted quota       | Deferred with the optional AI gateway                                                                       |
-| AT-09 Reproduction          | Same seed and injected clock reproduce logical state using the pinned navigation version                    |
-| AT-10 Reconnection          | Client and browser recovery checks, fifteen unique identities                                               |
-| AT-11 Provider failure      | Deferred with the optional AI gateway                                                                       |
-| AT-12 Safe publication      | Registered capability flags and CI foundation; generated-code and asset-review pipeline remains future work |
+| Original case               | Evidence / limit                                                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| AT-01 Persistent identity   | Store reopen test and actual server restart test                                                              |
+| AT-02 Shared world          | Two Colyseus clients and two browser contexts                                                                 |
+| AT-03 Autonomous progress   | Server test with zero connected clients                                                                       |
+| AT-04 Economy               | Transaction regression tests and seven-day conservation checks                                                |
+| AT-05 Non-coercive director | Explicit rejection test and persisted opportunity outcomes                                                    |
+| AT-06 Missing capability    | Unsupported intent records demand without inventory effects                                                   |
+| AT-07 AI off                | No external AI adapter is configured or invoked; metrics show zero calls                                      |
+| AT-08 Exhausted quota       | Durable daily/monthly request and spend reservations tested with mock/injected adapters; no paid provider     |
+| AT-09 Reproduction          | Same seed and injected clock reproduce logical state using the pinned navigation version                      |
+| AT-10 Reconnection          | Client and browser recovery checks, fifteen unique identities                                                 |
+| AT-11 Provider failure      | Injected failures, cancellation, circuit opening, and late-output rejection; real external transport deferred |
+| AT-12 Safe publication      | Registered capability flags and CI foundation; generated-code and asset-review pipeline remains future work   |
 
 ### Remaining product work
 
@@ -55,3 +55,9 @@ The original specification remains intact locally. English implementation and re
 ### PR review correction
 
 A public matchmaking request could create a second room and replace the active projection, interrupting updates to existing spectators. The server now rejects additional tavern creation. The integration regression checks rejection, the unchanged canonical room ID, and continued updates to connected clients.
+
+### Optional AI gateway — P1-001
+
+The server now provides an optional chronicler annotation preview through an authenticated administrator endpoint. Modes are off and local mock. The provider interface validates bounded public context and exact structured outputs, validates source IDs, reserves daily/monthly calls and worst-case spend in durable SQLite tables before dispatch, caches bounded results, limits concurrency, cancels timeouts, and opens a failure circuit. Failures preserve reservations and never block simulation. No external API provider, key, or paid service is connected. Preview text never becomes a world action or canonical event.
+
+The full existing simulation/persistence suite passed with the gateway tests, including the seven-day soak. Real server integration covers off/mock requests, unauthorized and malformed requests, quota exhaustion, and restart-retained usage. Browser coverage uses mocked administrator endpoints for UI behavior; actual server authorization is verified separately. Four browser tests passed, and the administrator screenshot was visually inspected. LF attributes prevent Windows checkout conversion from breaking the formatter; Vite cache is excluded from Git. See ADR 002 for the exact boundary and deferred live-provider work.

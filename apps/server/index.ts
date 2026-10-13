@@ -5,6 +5,9 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
+import { AiLedger } from '../../packages/ai/ledger';
+import { NarrativeGateway, configFromEnvironment } from '../../packages/ai/gateway';
+import { mockProvider, narrativeContext } from '../../packages/ai/contracts';
 import { createNavigation } from '../../packages/navigation/recast';
 import { tickWorld, emit } from '../../packages/simulation/engine';
 import { restoreWorld, STEP_MS } from '../../packages/simulation/recovery';
@@ -12,7 +15,10 @@ import { WorldStore } from '../../packages/persistence/store';
 import { publicWorld, capabilityCatalogue } from '../../packages/shared/world';
 import { PersonState, TavernState } from '../../packages/networking/schema';
 
+const aiConfig = configFromEnvironment(process.env);
 const navigation = await createNavigation();
+const aiLedger = new AiLedger(resolve(process.env.WORLD_DB ?? '.local/world.sqlite'));
+const ai = new NarrativeGateway(aiConfig, aiLedger, mockProvider);
 const store = new WorldStore(resolve(process.env.WORLD_DB ?? '.local/world.sqlite'));
 const world = restoreWorld(store, Date.now(), navigation);
 if (process.env.DIRECTOR_MODE === 'off') world.directorEnabled = false;
@@ -87,7 +93,7 @@ const game = new Server({
   express: (app) => {
     app.disable('x-powered-by');
     app.use(express.json({ limit: '2kb' }));
-    app.get('/health', (_req, res) => res.json({ status: 'ok', ai: 'off', persistent: true }));
+    app.get('/health', (_req, res) => res.json({ status: 'ok', ai: aiConfig.mode, persistent: true }));
     app.get('/api/world', (_req, res) => res.json(publicWorld(world)));
     app.get('/api/room', (_req, res) => res.json({ roomId: projection?.roomId }));
     app.get('/api/npcs/:id', (req, res) => {
@@ -117,17 +123,46 @@ const game = new Server({
         res.status(401).json({ error: 'Administrator token required' });
         return;
       }
+      const aiMetrics = ai.metrics();
       res.json({
         ticks,
         lastTickMs,
         worldVersion: world.version,
         viewers: projection?.viewers() ?? 0,
         events: world.sequence,
-        aiCalls: 0,
-        aiCost: 0,
-        aiMode: 'off',
+        aiCalls: aiMetrics.monthly.calls,
+        aiReservedUsd: aiMetrics.monthly.reservedMicroUsd / 1_000_000,
+        aiMode: aiConfig.mode,
+        aiDailyCalls: aiMetrics.daily.calls,
+        aiDailyLimit: aiConfig.dailyCalls,
+        aiMonthlyLimit: aiConfig.monthlyCalls,
+        aiLastStatus: aiMetrics.lastStatus,
+        aiCircuitOpen: aiMetrics.circuitOpen,
         directorEnabled: world.directorEnabled,
         persistence: 'sqlite-local',
+      });
+    });
+    app.post('/api/admin/ai/preview', async (req, res) => {
+      if (!authorized(req.headers.authorization)) {
+        res.status(401).json({ error: 'Administrator token required' });
+        return;
+      }
+      if (!z.object({}).strict().safeParse(req.body).success) {
+        res.status(400).json({ error: 'Preview requests do not accept prompts or world mutations' });
+        return;
+      }
+      const context = narrativeContext(publicWorld(world));
+      if (!context) {
+        res.json({ status: 'no-context' });
+        return;
+      }
+      const result = await ai.annotate(context);
+      res.json({
+        ...result,
+        source:
+          'annotation' in result
+            ? context.events.find((event) => event.id === result.annotation.sourceEventId)
+            : undefined,
       });
     });
     app.post('/api/admin/director', (req, res) => {
@@ -225,6 +260,7 @@ async function shutdown(code = 0) {
   clearInterval(timer);
   await game.gracefullyShutdown(false);
   store.close();
+  aiLedger.close();
   navigation.dispose();
   process.exit(code);
 }

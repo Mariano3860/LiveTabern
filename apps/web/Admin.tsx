@@ -7,7 +7,12 @@ interface Metrics {
   events: number;
   aiMode: string;
   aiCalls: number;
-  aiCost: number;
+  aiReservedUsd: number;
+  aiDailyCalls: number;
+  aiDailyLimit: number;
+  aiMonthlyLimit: number;
+  aiLastStatus: string;
+  aiCircuitOpen: boolean;
   directorEnabled: boolean;
   persistence: string;
 }
@@ -17,6 +22,29 @@ export default function Admin() {
     [metrics, setMetrics] = useState<Metrics | null>(null),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState<{
+    status: string;
+    annotation?: { caption: string };
+    source?: { text: string };
+  } | null>(null);
+  async function previewNarration() {
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch('/api/admin/ai/preview', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) throw new Error('Could not preview the chronicle annotation.');
+      setPreview(await response.json());
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Server unavailable');
+    } finally {
+      setBusy(false);
+    }
+  }
   async function refresh() {
     setBusy(true);
     setError('');
@@ -24,11 +52,20 @@ export default function Admin() {
       const response = await fetch('/api/metrics', { headers: { Authorization: `Bearer ${token}` } });
       if (!response.ok)
         throw new Error('Access denied. Configure ADMIN_TOKEN on the server and enter it here.');
-      setMetrics(await response.json());
-      const catalogue = await (await fetch('/api/capabilities')).json();
+      const nextMetrics = await response.json();
+      const catalogueResponse = await fetch('/api/capabilities');
+      if (!catalogueResponse.ok) throw new Error('Could not read the capability catalogue.');
+      const catalogue = await catalogueResponse.json();
+      setMetrics(nextMetrics);
       setCapabilities(catalogue.available);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Server unavailable');
+      setError(
+        e instanceof SyntaxError
+          ? 'The server is unavailable. Try again once it is running.'
+          : e instanceof Error
+            ? e.message
+            : 'Server unavailable',
+      );
     } finally {
       setBusy(false);
     }
@@ -132,9 +169,29 @@ export default function Admin() {
               </article>
             ))}
           </div>
+          <h2>Chronicler preview</h2>
           <p className="quiet">
-            Pausing opportunities leaves the autonomous simulation running. External AI remains disabled.
+            Preview an annotation of a confirmed event. This never changes the world or its chronicle. Mock
+            mode uses a local template; no external provider is connected.
           </p>
+          <button
+            className="archive-button"
+            disabled={busy || metrics.aiMode === 'off'}
+            onClick={() => void previewNarration()}
+          >
+            Preview annotation
+          </button>
+          {metrics.aiMode === 'off' && (
+            <p className="quiet">Set AI_MODE=mock on the server and restart to try the local preview.</p>
+          )}
+          {preview && (
+            <article className="narrative-preview" aria-live="polite">
+              <strong>Preview status: {preview.status}</strong>
+              {preview.annotation && <p>{preview.annotation.caption}</p>}
+              {preview.source && <p className="quiet">Confirmed source: {preview.source.text}</p>}
+            </article>
+          )}
+          <p className="quiet">Pausing opportunities leaves the autonomous simulation running.</p>
         </>
       )}
     </main>

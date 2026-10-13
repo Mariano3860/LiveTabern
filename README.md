@@ -25,6 +25,8 @@ The local world is stored in `.local/world.sqlite`, outside Git. Restarting rest
 
 For protected administration, copy `.env.example` to `.env`, set a long random `ADMIN_TOKEN`, and restart the server. Open http://127.0.0.1:5173/admin and enter that token. Metrics and director/capability controls require it. Tokens are not stored in browser local storage or URLs.
 
+To exercise the optional chronicler boundary, set `AI_MODE=mock` and restart, then use **Preview annotation** in administration. This is a local template over confirmed public events, not a model call. It never changes the world. `AI_DAILY_CALLS` and `AI_MONTHLY_CALLS` limit attempts; reservations survive restart in the world database. Defaults allow 20 daily / 200 monthly attempts. Spend limits remain zero. `AI_MODE=off` is the default, and no paid provider is connected. See [the gateway decision](docs/ADR/002-optional-narrative-gateway.md) for timeout, caching, failure, and budget behavior.
+
 After building, `npm start` serves the built frontend and world together at http://127.0.0.1:3001. It binds to loopback; this is a local launch, not a public deployment.
 
 ## Verify
