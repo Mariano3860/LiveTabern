@@ -543,7 +543,7 @@ function Person({
         <Round p={[0, 0.66, 0]} s={[0.255, 0.045, 0.19]} c="#453423" />
         <Box p={[0, 0.66, 0.18]} s={[0.11, 0.07, 0.035]} c="#d1b66b" />
         <Shape p={[0, 1.3, 0]} s={[0.1, 0.11, 0.1]} c={skin} />
-        <group ref={head} position={[0, 1.49, 0]} scale={0.78}>
+        <group ref={head} position={[0, 1.49, 0]} scale={0.6}>
           <Shape p={[0, 0, 0]} s={[0.22, 0.28, 0.21]} c={skin} />
           <mesh position={[0, 0.15, -0.015]}>
             <sphereGeometry args={[0.232, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
