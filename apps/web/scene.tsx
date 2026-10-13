@@ -196,13 +196,7 @@ function EmberField({ reduced }: { reduced: boolean }) {
   return (
     <instancedMesh ref={instances} args={[undefined, undefined, embers.length]} frustumCulled={false}>
       <sphereGeometry args={[0.028, 8, 6]} />
-      <meshBasicMaterial
-        color="#ffd087"
-        transparent
-        opacity={0.62}
-        depthWrite={false}
-        toneMapped={false}
-      />
+      <meshBasicMaterial color="#ffd087" transparent opacity={0.62} depthWrite={false} toneMapped={false} />
     </instancedMesh>
   );
 }
@@ -619,17 +613,10 @@ function Person({
             <sphereGeometry args={[0.232, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
             <meshStandardMaterial color={hair} roughness={0.95} />
           </mesh>
-          {variant % 3 === 1 && (
-            <Shape p={[0, -0.1, -0.08]} s={[0.17, 0.18, 0.11]} c={hair} />
-          )}
+          {variant % 3 === 1 && <Shape p={[0, -0.1, -0.08]} s={[0.17, 0.18, 0.11]} c={hair} />}
           {variant % 3 === 2 &&
             [-1, 1].map((side) => (
-              <Shape
-                key={side}
-                p={[side * 0.18, -0.08, -0.005]}
-                s={[0.055, 0.18, 0.09]}
-                c={hair}
-              />
+              <Shape key={side} p={[side * 0.18, -0.08, -0.005]} s={[0.055, 0.18, 0.09]} c={hair} />
             ))}
           <Shape p={[-0.22, -0.035, 0]} s={[0.035, 0.075, 0.055]} c={skin} />
           <Shape p={[0.22, -0.035, 0]} s={[0.035, 0.075, 0.055]} c={skin} />
