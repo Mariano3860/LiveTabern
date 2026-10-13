@@ -66,6 +66,8 @@ export function createWorld(now: number, seed = 1729): World {
     completedCommands: [],
     directorTurn: 0,
     disabledActions: [],
+    musicGroups: [],
+    musicNext: now + 1000,
     inhabitants: cast.map(([name, role, description, color], i) => ({
       id: `npc-${i + 1}`,
       name,
@@ -170,7 +172,9 @@ export function canExecute(world: World, npc: Inhabitant, action: Action, partne
     return 'Must reach the stage with an instrument or voice';
   if (
     action === 'dance' &&
-    !world.inhabitants.some((n) => n.action === 'play_music' && n.plan?.phase === 'performing')
+    !world.inhabitants.some(
+      (n) => n.action === 'play_music' && n.plan?.phase === 'performing' && n.plan.applied,
+    )
   )
     return 'There must be live music';
   return null;
@@ -324,6 +328,13 @@ function available(world: World, points: Point[], npc: Inhabitant): Point | unde
   );
 }
 function planAction(world: World, npc: Inhabitant, navigation: Navigation) {
+  if (
+    actions.every((action) => world.disabledActions.includes(action)) ||
+    (npc.id === 'npc-1' && world.disabledActions.includes('rest'))
+  ) {
+    npc.nextDecision = world.time + 4000;
+    return;
+  }
   let action = chooseAction(npc, random(world), world.disabledActions);
   let destination: Point | undefined, targetId: string | undefined;
   if (npc.id === 'npc-1') {
@@ -332,7 +343,11 @@ function planAction(world: World, npc: Inhabitant, navigation: Navigation) {
   } else if (action === 'drink') destination = available(world, barSpots, npc);
   else if (action === 'play_music') destination = available(world, stageSpots, npc);
   else if (action === 'dance') {
-    if (world.inhabitants.some((n) => n.action === 'play_music' && n.plan?.phase === 'performing'))
+    if (
+      world.inhabitants.some(
+        (n) => n.action === 'play_music' && n.plan?.phase === 'performing' && n.plan.applied,
+      )
+    )
       destination = available(world, danceSpots, npc);
   } else if (action === 'chat' || action === 'trade') {
     const partner = world.inhabitants
@@ -358,6 +373,10 @@ function planAction(world: World, npc: Inhabitant, navigation: Navigation) {
     }
   } else if (action === 'rest') destination = available(world, [...seats, ...hearthSpots], npc);
   if (!destination) {
+    if (world.disabledActions.includes('wander')) {
+      npc.nextDecision = world.time + 2000;
+      return;
+    }
     action = 'wander';
     for (let i = 0; i < 30; i++) {
       const p: Point = [-6 + random(world) * 12.3, -4.8 + random(world) * 9.6];
@@ -388,6 +407,165 @@ function planAction(world: World, npc: Inhabitant, navigation: Navigation) {
     until: 0,
     applied: false,
   };
+}
+export function inviteDuet(world: World, firstId: string, secondId: string, navigation: Navigation): boolean {
+  const first = world.inhabitants.find((n) => n.id === firstId),
+    second = world.inhabitants.find((n) => n.id === secondId);
+  if (
+    world.time < world.musicNext ||
+    world.disabledActions.includes('play_music') ||
+    !first ||
+    !second ||
+    first === second ||
+    [first, second].some((n) => n.instrument === 'none' || n.plan || n.energy < 45 || n.thirst > 80) ||
+    world.musicGroups.some(
+      (g) => g.status !== 'resting' && g.members.some((id) => id === firstId || id === secondId),
+    )
+  )
+    return false;
+  const spots = stageSpots.filter(
+    (point) =>
+      !world.inhabitants.some(
+        (n) => n.id !== firstId && n.id !== secondId && n.plan && distance(n.plan.destination, point) < 0.6,
+      ),
+  );
+  if (spots.length < 2) return false;
+  world.musicNext = world.time + 60000;
+  const willing = [first, second].map((n, i) => {
+    const partner = i === 0 ? second : first;
+    const chance = Math.max(
+      0,
+      Math.min(1, n.creativity * 0.75 + n.sociability * 0.25 + (n.relationships[partner.id] ?? 0) / 500),
+    );
+    return random(world) < chance;
+  });
+  if (willing.some((accept) => !accept)) {
+    const reluctant = willing[0] ? second : first;
+    emit(
+      world,
+      'story',
+      [firstId, secondId],
+      `${reluctant.name} declines a duet invitation. There will be another evening.`,
+    );
+    return false;
+  }
+  const paths = [first, second].map((n, i) => navigation.path(n.position, spots[i]));
+  if (paths.some((path, i) => !path.length && distance([first, second][i].position, spots[i]) > 0.25)) {
+    emit(
+      world,
+      'story',
+      [firstId, secondId],
+      `${first.name} and ${second.name} agree to a duet, but cannot reach the stage.`,
+    );
+    return false;
+  }
+  const members: [string, string] = [firstId, secondId],
+    id = `duet:${[...members].sort().join(':')}`;
+  let group = world.musicGroups.find((g) => g.id === id);
+  if (!group) {
+    if (world.musicGroups.length >= 8) {
+      const oldest = world.musicGroups.findIndex((g) => g.status === 'resting');
+      if (oldest < 0) return false;
+      world.musicGroups.splice(oldest, 1);
+    }
+    group = {
+      id,
+      name: `${first.name} & ${second.name}`,
+      members,
+      commandIds: ['', ''],
+      status: 'resting',
+      created: world.time,
+      startedAt: 0,
+      until: 0,
+      performances: 0,
+      outcome: '',
+    };
+    world.musicGroups.push(group);
+  }
+  group.members = members;
+  group.status = 'gathering';
+  group.until = world.time + 30000;
+  group.outcome = 'Both musicians accept and make their way to the stage.';
+  for (const [i, npc] of [first, second].entries()) {
+    const command = `command:${++world.commandSequence}`;
+    group.commandIds[i] = command;
+    npc.action = 'play_music';
+    npc.target = [...spots[i]];
+    npc.plan = {
+      id: command,
+      action: 'play_music',
+      destination: [...spots[i]],
+      path: paths[i],
+      phase: paths[i].length ? 'walking' : 'performing',
+      until: 0,
+      applied: false,
+    };
+  }
+  emit(world, 'story', members, `${group.name} agree to play a duet and head for the little stage.`);
+  return true;
+}
+function updateDuets(world: World) {
+  for (const group of world.musicGroups) {
+    if (group.status === 'resting') continue;
+    const members = group.members.map((id) => world.inhabitants.find((n) => n.id === id)!);
+    const plansIntact = members.every((n, i) => n.plan?.id === group.commandIds[i]);
+    let outcome: string | undefined;
+    if (!plansIntact || world.disabledActions.includes('play_music'))
+      outcome = 'The duet pauses before its next phrase.';
+    else if (group.status === 'gathering' && world.time >= group.until)
+      outcome = 'The musicians could not gather in time.';
+    else if (group.status === 'performing' && world.time >= group.until)
+      outcome = 'Their final notes settle gently into the common room.';
+    else if (group.status === 'gathering' && members.every((n) => n.plan!.phase === 'performing')) {
+      if (
+        members.some(
+          (n, i) =>
+            n.energy < 40 ||
+            n.thirst > 85 ||
+            canExecute(world, n, 'play_music') ||
+            world.completedCommands.includes(group.commandIds[i]) ||
+            Number(group.commandIds[i].slice(8)) <= n.lastCommand,
+        )
+      ) {
+        outcome = 'The musicians choose to rest before playing together.';
+      } else {
+        // Both arrival checks pass before either confirmed music effect is applied.
+        for (const [i, n] of members.entries()) {
+          executeAction(world, n.id, 'play_music', group.commandIds[i]);
+          n.plan!.applied = true;
+          n.plan!.until = world.time + 32000;
+        }
+        group.status = 'performing';
+        group.startedAt = world.time;
+        group.until = world.time + 32000;
+        group.performances++;
+        group.outcome = 'Voice and strings share the same song.';
+        for (const [i, n] of members.entries()) {
+          const partner = members[1 - i];
+          n.relationships[partner.id] = Math.min(100, (n.relationships[partner.id] ?? 0) + 4);
+          n.socialNeed = Math.max(0, n.socialNeed - 20);
+        }
+        emit(
+          world,
+          'play_music',
+          group.members,
+          `${group.name} begin “The Road Leads Home” together.`,
+          'Two willing musicians; one shared performance.',
+        );
+      }
+    }
+    if (outcome) {
+      group.status = 'resting';
+      group.outcome = outcome;
+      group.until = world.time;
+      for (const [i, n] of members.entries())
+        if (n.plan?.id === group.commandIds[i]) {
+          n.plan = null;
+          n.nextDecision = world.time + 3000;
+        }
+      emit(world, 'story', group.members, `${group.name}: ${outcome}`);
+    }
+  }
 }
 export function offerOpportunity(world: World, kind: 'music' | 'market' | 'hearth') {
   const id = `opportunity:${world.version}:${world.opportunities.length}`;
@@ -441,6 +619,12 @@ export function tickWorld(world: World, now: number, navigation: Navigation): Wo
     sequence = world.sequence;
   world.time = now;
   world.version++;
+  if (now >= world.musicNext && !world.disabledActions.includes('play_music')) {
+    const musicians = world.inhabitants.filter(
+      (n) => n.instrument !== 'none' && !n.plan && n.energy >= 45 && n.thirst <= 80,
+    );
+    if (musicians.length >= 2) inviteDuet(world, musicians[0].id, musicians[1].id, navigation);
+  }
   const day = Math.floor(now / 86400000);
   if (day > world.supplyDay) {
     world.supplyDay = day;
@@ -459,6 +643,11 @@ export function tickWorld(world: World, now: number, navigation: Navigation): Wo
       ),
     );
     const plan = npc.plan;
+    if (plan && world.disabledActions.includes(plan.action)) {
+      npc.plan = null;
+      npc.nextDecision = now + 2000;
+      continue;
+    }
     if (!plan && now >= npc.nextDecision) {
       planAction(world, npc, navigation);
       continue;
@@ -484,6 +673,7 @@ export function tickWorld(world: World, now: number, navigation: Navigation): Wo
       if (!plan.path.length) plan.phase = 'performing';
     }
     if (plan.phase === 'performing') {
+      if (world.musicGroups.some((g) => g.status !== 'resting' && g.members.includes(npc.id))) continue;
       if (!plan.applied) {
         if (!executeAction(world, npc.id, plan.action, plan.id, plan.targetId)) {
           npc.plan = null;
@@ -499,6 +689,7 @@ export function tickWorld(world: World, now: number, navigation: Navigation): Wo
       }
     }
   }
+  updateDuets(world);
   if (world.directorEnabled && now >= world.directorNext) {
     const kinds = ['music', 'market', 'hearth'] as const;
     const opportunity = offerOpportunity(world, kinds[world.directorTurn++ % 3]);

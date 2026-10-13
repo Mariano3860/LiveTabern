@@ -45,6 +45,8 @@ function App() {
     setHistoryError('');
   }, [filter, category]);
   const npc = world?.inhabitants.find((n) => n.id === selected);
+  const currentDuet = world?.musicGroups.find((group) => group.status !== 'resting');
+  const membership = world?.musicGroups.find((group) => group.members.includes(selected ?? ''));
   const combined = [...older, ...(world?.events ?? [])];
   const events = [...new Map(combined.map((e) => [e.id, e])).values()]
     .filter(
@@ -147,6 +149,17 @@ function App() {
             )}
           </div>
           <div className="scene-hint">Drag to explore · Scroll to zoom · Select a traveler</div>
+          {currentDuet && (
+            <div className="performance-banner" role="status" aria-label="Shared performance">
+              <span>{currentDuet.status === 'performing' ? 'NOW PLAYING' : 'GATHERING AT THE STAGE'}</span>
+              <strong>{currentDuet.name}</strong>
+              <small>
+                {currentDuet.status === 'performing'
+                  ? 'The Road Leads Home · voice & lute'
+                  : 'Two musicians, a shared invitation'}
+              </small>
+            </div>
+          )}
         </section>
         <aside className="chronicle">
           <div className="sidebar-tabs">
@@ -250,6 +263,24 @@ function App() {
                   <span>servings of ale</span>
                 </div>
               </div>
+              <h3>Music under this roof</h3>
+              {world?.musicGroups.length ? (
+                world.musicGroups.map((group) => (
+                  <article className="thread music-group" key={group.id}>
+                    <strong>{group.name}</strong>
+                    <p>{group.outcome}</p>
+                    <small>
+                      {group.status === 'performing'
+                        ? 'Playing together'
+                        : group.status === 'gathering'
+                          ? 'On their way to the stage'
+                          : `${group.performances} shared performances`}
+                    </small>
+                  </article>
+                ))
+              ) : (
+                <p className="quiet">A duet begins when both musicians feel like sharing a song.</p>
+              )}
               <h3>Threads of the evening</h3>
               {world?.opportunities
                 .slice(-3)
@@ -298,7 +329,9 @@ function App() {
                 <strong>{n.name}</strong>
                 <small>{n.role}</small>
               </span>
-              <em>{n.phase === 'walking' ? 'walking' : label(n.action)}</em>
+              <em>
+                {n.phase === 'walking' ? 'walking' : n.phase === 'idle' ? 'taking a moment' : label(n.action)}
+              </em>
             </button>
           ))}
         </div>
@@ -320,11 +353,25 @@ function App() {
           <p>{npc.description}</p>
           <dl>
             <dt>Now</dt>
-            <dd>{npc.phase === 'walking' ? `On the way to ${label(npc.action)}` : label(npc.action)}</dd>
+            <dd>
+              {npc.phase === 'walking'
+                ? `On the way to ${label(npc.action)}`
+                : npc.phase === 'idle'
+                  ? 'Taking a quiet moment'
+                  : label(npc.action)}
+            </dd>
             <dt>Spirits</dt>
             <dd>{npc.mood > 70 ? 'Cheerful' : 'Content'}</dd>
             <dt>Coins</dt>
             <dd>{npc.coins}</dd>
+            {membership && (
+              <>
+                <dt>Duet</dt>
+                <dd>
+                  {membership.name} · {membership.performances} shared performances
+                </dd>
+              </>
+            )}
           </dl>
           <button
             className="archive-button"

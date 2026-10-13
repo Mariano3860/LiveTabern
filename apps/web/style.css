@@ -182,6 +182,34 @@ select {
   font-size: 10px;
   pointer-events: none;
 }
+.performance-banner {
+  position: absolute;
+  top: 58px;
+  left: 20px;
+  right: 20px;
+  z-index: 1;
+  pointer-events: none;
+  border: 1px solid #75603b;
+  border-radius: 5px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 1rem;
+  padding: 0.75rem 1rem;
+  background: #302719;
+  color: #edca89;
+}
+.performance-banner span {
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+}
+.performance-banner strong {
+  font-family: Georgia, serif;
+  font-size: 1.05rem;
+}
+.performance-banner small {
+  color: #c6ba9b;
+}
 .section-title {
   display: flex;
   align-items: center;

@@ -114,4 +114,13 @@ describe('authoritative simulation', () => {
       previous = point;
     }
   });
+  it('stays idle when every capability is disabled and cancels unavailable movement', () => {
+    const world = createWorld(0),
+      positions = world.inhabitants.map((npc) => [...npc.position]);
+    world.disabledActions = ['wander', 'rest', 'drink', 'chat', 'trade', 'play_music', 'dance'];
+    for (let now = 250; now <= 10000; now += 250) tickWorld(world, now, navigation);
+    expect(world.inhabitants.every((npc) => npc.plan === null)).toBe(true);
+    expect(world.inhabitants.map((npc) => npc.position)).toEqual(positions);
+    expect(world.events).toHaveLength(1);
+  });
 });
