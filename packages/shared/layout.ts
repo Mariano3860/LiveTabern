@@ -43,3 +43,4 @@ export function isWalkable([x, z]: Point, margin = 0.35): boolean {
   return !tables.some(([tx, tz]) => Math.hypot(x - tx, z - tz) < 1 + margin);
 }
 export const distance = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+export const workbenchSpot: Point = [6.2, 3.1];

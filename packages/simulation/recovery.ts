@@ -24,7 +24,7 @@ export function restoreWorld(store: WorldStore, now: number, navigation: Navigat
     previous.time = now;
     previous.version++;
     for (const npc of previous.inhabitants) {
-      if (npc.plan) npc.plan.until += skipped;
+      if (npc.plan && npc.plan.until > 0) npc.plan.until += skipped;
       npc.nextDecision += skipped;
     }
     previous.directorNext += skipped;

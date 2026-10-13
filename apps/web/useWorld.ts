@@ -24,7 +24,15 @@ export function useWorld() {
     const events = latestJson<PublicWorld['events']>([]),
       opportunities = latestJson<PublicWorld['opportunities']>([]),
       demands = latestJson<PublicWorld['demands']>([]),
-      musicGroups = latestJson<PublicWorld['musicGroups']>([]);
+      musicGroups = latestJson<PublicWorld['musicGroups']>([]),
+      workshop = latestJson<PublicWorld['workshop']>({
+        wood: 0,
+        strings: 0,
+        craftedLutes: 0,
+        suppliedWood: 0,
+        suppliedStrings: 0,
+        delivered: false,
+      });
     if (import.meta.env.DEV)
       window.__TAVERN__ = { snapshot: () => (latest ? structuredClone(latest) : null) };
     const endpoint =
@@ -61,6 +69,7 @@ export function useWorld() {
         opportunities: opportunities(state.opportunities),
         demands: demands(state.demands),
         musicGroups: musicGroups(state.musicGroups),
+        workshop: workshop(state.workshop),
       };
       latest = { world: next, viewers: state.viewers };
       setWorld(next);

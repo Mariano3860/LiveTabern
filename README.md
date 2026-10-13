@@ -1,6 +1,6 @@
 # LiveTabern
 
-A persistent, shared 3D fantasy tavern for the web. Watch fifteen travelers drink, trade, talk, rest, dance, and make music while their history continues between visits.
+A persistent, shared 3D fantasy tavern for the web. Watch fifteen travelers drink, trade, talk, rest, dance, craft, and make music while their history continues between visits.
 
 ![The Wandering Ember tavern](docs/screenshots/tavern.png)
 
@@ -19,7 +19,9 @@ No model API keys or paid services are required. External AI is off.
 
 Drag to orbit, scroll to zoom, and select a traveler or their card. Try the fireside and stage cameras, follow a character, filter the chronicle, or read earlier events. Sound is opt-in. Low graphics quality and reduced motion are available.
 
-Willing musicians can form a persistent duet, walk to separate places on the stage, and begin a shared performance once both arrive. Watch the performance banner, open a musician's profile, or use **Under the roof** to see their group's history. Duets add a synthesized harmony when sound is enabled. The current cast supports Elena and Finch; larger bands and new instruments remain future work.
+Willing musicians can form a persistent duet, walk to separate places on the stage, and begin a shared performance once both arrive. Watch the performance banner, open a musician's profile, or use **Under the roof** to see their group's history. Duets add a synthesized harmony when sound is enabled.
+
+Pip can build a lute at the little workshop in the right corner. A single starter kit supplies three pieces of wood and a set of strings. Pip walks there, works for twelve seconds, and consumes those materials when the instrument is complete. The lute survives restarts and lets Pip join Elena and Finch in the music. **Under the roof** shows the materials and completed instruments; profiles show instrument ownership. More recipes and material replenishment remain future work.
 
 ## Persistence and administration
 

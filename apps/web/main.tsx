@@ -160,7 +160,7 @@ function App() {
               <strong>{currentDuet.name}</strong>
               <small>
                 {currentDuet.status === 'performing'
-                  ? 'The Road Leads Home · voice & lute'
+                  ? 'A live duet under the hearthlight'
                   : 'Two musicians, a shared invitation'}
               </small>
             </div>
@@ -211,6 +211,7 @@ function App() {
                       'trade',
                       'play_music',
                       'dance',
+                      'craft_instrument',
                       'story',
                       'capability',
                       'system',
@@ -286,6 +287,21 @@ function App() {
               ) : (
                 <p className="quiet">A duet begins when both musicians feel like sharing a song.</p>
               )}
+              <h3>The little workshop</h3>
+              <article className="thread workshop">
+                <strong>
+                  {world?.workshop.craftedLutes
+                    ? 'A handmade lute finds its voice'
+                    : 'An instrument waiting to be made'}
+                </strong>
+                <p>
+                  {world?.workshop.wood ?? 0} pieces of wood · {world?.workshop.strings ?? 0} sets of strings
+                </p>
+                <small>
+                  {world?.workshop.craftedLutes ?? 0} {world?.workshop.craftedLutes === 1 ? 'lute' : 'lutes'}{' '}
+                  crafted · twelve seconds of work per instrument
+                </small>
+              </article>
               <h3>Threads of the evening</h3>
               {world?.opportunities
                 .slice(-3)
@@ -303,7 +319,9 @@ function App() {
                   <article className="thread" key={d.id}>
                     <strong>{label(d.id)}</strong>
                     <p>{d.reason}</p>
-                    <small>Requested {d.count} time · awaiting development</small>
+                    <small>
+                      Requested {d.count} time · {d.fulfilled ? 'fulfilled' : 'awaiting development'}
+                    </small>
                   </article>
                 ))
               ) : (
@@ -369,6 +387,8 @@ function App() {
             <dd>{npc.mood > 70 ? 'Cheerful' : 'Content'}</dd>
             <dt>Coins</dt>
             <dd>{npc.coins}</dd>
+            <dt>Instrument</dt>
+            <dd>{npc.instrument === 'none' ? 'None yet' : label(npc.instrument)}</dd>
             {membership && (
               <>
                 <dt>Duet</dt>

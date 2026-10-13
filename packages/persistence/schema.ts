@@ -72,6 +72,23 @@ export const worldSchema = z
     suppliedAle: z.number().int().nonnegative(),
     supplyDay: z.number().int(),
     economyHour: z.number().int().default(-1),
+    workshop: z
+      .object({
+        wood: z.number().int().nonnegative(),
+        strings: z.number().int().nonnegative(),
+        craftedLutes: z.number().int().nonnegative(),
+        suppliedWood: z.number().int().nonnegative(),
+        suppliedStrings: z.number().int().nonnegative(),
+        delivered: z.boolean(),
+      })
+      .default({
+        wood: 0,
+        strings: 0,
+        craftedLutes: 0,
+        suppliedWood: 0,
+        suppliedStrings: 0,
+        delivered: false,
+      }),
     opportunities: z.array(
       z.object({
         id: z.string(),
@@ -92,6 +109,7 @@ export const worldSchema = z
         reason: z.string(),
         priority: bounded,
         lastSeen: z.number(),
+        fulfilled: z.boolean().optional(),
       }),
     ),
     directorNext: z.number(),
@@ -123,6 +141,18 @@ export const worldSchema = z
       ctx.addIssue({ code: 'custom', message: 'Duplicate inhabitant identities' });
     if (world.stock + world.consumedAle !== world.suppliedAle)
       ctx.addIssue({ code: 'custom', message: 'Ale provenance does not balance' });
+    if (
+      world.workshop.wood + 3 * world.workshop.craftedLutes !== world.workshop.suppliedWood ||
+      world.workshop.strings + world.workshop.craftedLutes !== world.workshop.suppliedStrings
+    )
+      ctx.addIssue({ code: 'custom', message: 'Workshop provenance does not balance' });
+    if (!world.workshop.delivered && world.workshop.suppliedWood + world.workshop.suppliedStrings > 0)
+      ctx.addIssue({ code: 'custom', message: 'Undelivered workshop must be empty' });
+    if (
+      world.inhabitants.filter((npc) => npc.instrument === 'lute').length !==
+      1 + world.workshop.craftedLutes
+    )
+      ctx.addIssue({ code: 'custom', message: 'Crafted lute ownership does not balance' });
     const activeMembers = new Set<string>();
     for (const group of world.musicGroups) {
       if (

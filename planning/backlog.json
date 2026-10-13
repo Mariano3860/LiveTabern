@@ -117,6 +117,18 @@
         "Document restore into a separate path without overwriting the live world",
         "Expose snapshot age and bounded payload metrics to administrators"
       ]
+    },
+    {
+      "id": "P1-006",
+      "title": "Turn Pip's instrument wish into persistent crafting and music",
+      "status": "done",
+      "dependencies": ["P1-005"],
+      "acceptance": [
+        "Require the workbench, materials, energy, and elapsed work before creating a lute",
+        "Preserve materials, ownership, unfinished work, and unique completion events across restart",
+        "Reject duplicate, disabled, premature, and invalid crafting commands",
+        "Observe Pip's real workshop journey, tool animation, and subsequent music in the browser"
+      ]
     }
   ]
 }

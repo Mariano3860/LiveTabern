@@ -35,7 +35,8 @@ describe('sustainable closed tavern economy', () => {
     expect(world.inhabitants[0].coins).toBe(4);
     expect(world.stock).toBe(240);
     expect(world.suppliedAle).toBe(240);
-    expect(world.events).toHaveLength(1);
+    expect(world.events).toHaveLength(2);
+    expect(world.events[1].text).toContain('workshop receives');
   });
   it('tops up exactly the consumed stock and does not delete oversized legacy reserves', () => {
     const world = idleWorld();

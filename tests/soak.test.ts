@@ -37,6 +37,8 @@ it('survives seven simulated days with bounded state and conserved resources', (
       expect(world.inhabitants.reduce((s, n) => s + n.coins, 0)).toBe(money);
       expect(world.stock + world.consumedAle).toBe(world.suppliedAle);
       expect(world.stock).toBeLessThanOrEqual(240);
+      expect(world.workshop.wood + 3 * world.workshop.craftedLutes).toBe(world.workshop.suppliedWood);
+      expect(world.workshop.strings + world.workshop.craftedLutes).toBe(world.workshop.suppliedStrings);
       expect(world.inhabitants.reduce((s, n) => s + n.inventory.tonic, 0)).toBe(24);
       expect(world.events.length).toBeLessThanOrEqual(240);
       expect(world.musicGroups.length).toBeLessThanOrEqual(8);
@@ -50,6 +52,8 @@ it('survives seven simulated days with bounded state and conserved resources', (
   expect(actionTypes.has('trade')).toBe(true);
   expect(actionTypes.has('play_music')).toBe(true);
   expect(actionTypes.has('dance')).toBe(true);
+  expect(world.workshop.craftedLutes).toBe(1);
+  expect(world.inhabitants.filter((npc) => npc.instrument === 'lute')).toHaveLength(2);
   expect(sharedPerformances).toBeGreaterThan(0);
   for (const day of daily) {
     expect(day.purchases).toBeGreaterThan(100);

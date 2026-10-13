@@ -81,6 +81,7 @@ class TavernRoom extends Room<{ state: TavernState }> {
     this.state.opportunities = JSON.stringify(view.opportunities);
     this.state.demands = JSON.stringify(view.demands);
     this.state.musicGroups = JSON.stringify(view.musicGroups);
+    this.state.workshop = JSON.stringify(view.workshop);
   }
 }
 function authorized(header?: string) {
