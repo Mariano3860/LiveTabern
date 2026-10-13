@@ -93,6 +93,30 @@
         "Replenish ale through auditable timed supply events",
         "Verify bounded state and resource conservation during long-running simulation"
       ]
+    },
+    {
+      "id": "P1-004",
+      "title": "Review portable agent skills and apply relevant React rules",
+      "status": "done",
+      "dependencies": ["P1-003"],
+      "acceptance": [
+        "Inspect sources and pin reviewed skill revisions",
+        "Validate Codex-compatible skill metadata",
+        "Apply a concrete improvement without adding runtime dependencies",
+        "Preserve chronicle filters, reconnection, and duet browser behavior"
+      ]
+    },
+    {
+      "id": "P1-005",
+      "title": "Add verified local backups and world diagnostics",
+      "status": "todo",
+      "dependencies": ["P1-004"],
+      "acceptance": [
+        "Create a consistent backup of a running SQLite world",
+        "Verify saved state, history, and AI quota records before accepting the backup",
+        "Document restore into a separate path without overwriting the live world",
+        "Expose snapshot age and bounded payload metrics to administrators"
+      ]
     }
   ]
 }

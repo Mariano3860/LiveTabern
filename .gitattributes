@@ -1,2 +1,4 @@
 * text=auto eol=lf
 *.png binary
+.agents/skills/ponytail/** linguist-vendored
+.agents/skills/react-best-practices/** linguist-vendored
