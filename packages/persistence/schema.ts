@@ -17,6 +17,7 @@ const plan = z.object({
   phase: z.enum(['walking', 'performing']),
   until: z.number(),
   applied: z.boolean(),
+  blockedSince: z.number().finite().optional(),
 });
 export const eventSchema = z.object({
   id: z.string(),

@@ -378,7 +378,12 @@ export function chooseAction(npc: Inhabitant, novelty: number, disabled: Action[
 }
 function available(world: World, points: Point[], npc: Inhabitant): Point | undefined {
   return points.find(
-    (p) => !world.inhabitants.some((n) => n.id !== npc.id && n.plan && distance(n.plan.destination, p) < 0.6),
+    (p) =>
+      !world.inhabitants.some(
+        (n) =>
+          n.id !== npc.id &&
+          (distance(n.position, p) < 0.55 || (n.plan && distance(n.plan.destination, p) < 0.6)),
+      ),
   );
 }
 function planAction(world: World, npc: Inhabitant, navigation: Navigation) {
@@ -435,7 +440,7 @@ function planAction(world: World, npc: Inhabitant, navigation: Navigation) {
     }
     action = 'wander';
     for (let i = 0; i < 30; i++) {
-      const p: Point = [-6 + random(world) * 12.3, -4.8 + random(world) * 9.6];
+      const p: Point = [-8.1 + random(world) * 16.2, -4.8 + random(world) * 12.3];
       if (isWalkable(p, 0.55)) {
         destination = p;
         break;
@@ -482,10 +487,24 @@ export function inviteDuet(world: World, firstId: string, secondId: string, navi
   const spots = stageSpots.filter(
     (point) =>
       !world.inhabitants.some(
-        (n) => n.id !== firstId && n.id !== secondId && n.plan && distance(n.plan.destination, point) < 0.6,
+        (n) =>
+          n.id !== firstId &&
+          n.id !== secondId &&
+          (distance(n.position, point) < 0.55 || (n.plan && distance(n.plan.destination, point) < 0.6)),
       ),
   );
   if (spots.length < 2) return false;
+  const assignments = spots
+    .flatMap((firstSpot) =>
+      spots.filter((spot) => spot !== firstSpot).map((secondSpot) => [firstSpot, secondSpot] as const),
+    )
+    .sort(
+      (a, b) =>
+        distance(first.position, a[0]) +
+        distance(second.position, a[1]) -
+        distance(first.position, b[0]) -
+        distance(second.position, b[1]),
+    )[0];
   world.musicNext = world.time + 60000;
   const willing = [first, second].map((n, i) => {
     const partner = i === 0 ? second : first;
@@ -505,8 +524,8 @@ export function inviteDuet(world: World, firstId: string, secondId: string, navi
     );
     return false;
   }
-  const paths = [first, second].map((n, i) => navigation.path(n.position, spots[i]));
-  if (paths.some((path, i) => !path.length && distance([first, second][i].position, spots[i]) > 0.25)) {
+  const paths = [first, second].map((n, i) => navigation.path(n.position, assignments[i]));
+  if (paths.some((path, i) => !path.length && distance([first, second][i].position, assignments[i]) > 0.25)) {
     emit(
       world,
       'story',
@@ -546,11 +565,11 @@ export function inviteDuet(world: World, firstId: string, secondId: string, navi
     const command = `command:${++world.commandSequence}`;
     group.commandIds[i] = command;
     npc.action = 'play_music';
-    npc.target = [...spots[i]];
+    npc.target = [...assignments[i]];
     npc.plan = {
       id: command,
       action: 'play_music',
-      destination: [...spots[i]],
+      destination: [...assignments[i]],
       path: paths[i],
       phase: paths[i].length ? 'walking' : 'performing',
       until: 0,
@@ -762,21 +781,64 @@ export function tickWorld(world: World, now: number, navigation: Navigation): Wo
     if (!plan) continue;
     if (plan.phase === 'walking') {
       let budget = elapsed * (npc.role === 'Apprentice' ? 1.05 : 0.85);
+      const previousWaypoint = plan.path[0];
+      const previousDistance = previousWaypoint ? distance(npc.position, previousWaypoint) : 0;
+      const previousPathLength = plan.path.length;
       while (plan.path.length && budget > 0) {
         const p = plan.path[0],
           d = distance(npc.position, p);
-        if (d <= budget) {
-          npc.position = [...p];
+        if (d < 0.02) {
           plan.path.shift();
-          budget -= d;
-        } else {
-          npc.position = [
-            npc.position[0] + ((p[0] - npc.position[0]) / d) * budget,
-            npc.position[1] + ((p[1] - npc.position[1]) / d) * budget,
-          ];
-          budget = 0;
+          continue;
         }
+        if (
+          d < 0.42 &&
+          plan.path.length > 1 &&
+          world.inhabitants.some((other) => other.id !== npc.id && distance(other.position, p) < 0.55)
+        ) {
+          plan.path.shift();
+          continue;
+        }
+        const step = Math.min(d, budget),
+          heading = Math.atan2(p[1] - npc.position[1], p[0] - npc.position[0]);
+        const clear = (candidate: Point) =>
+          isWalkable(candidate, 0.42) &&
+          world.inhabitants.every(
+            (other) =>
+              other.id === npc.id ||
+              distance(candidate, other.position) >= 0.46 ||
+              distance(candidate, other.position) > distance(npc.position, other.position) + 0.01,
+          );
+        // A short local steering step respects both furniture and the current positions of other people.
+        // Fixed angle order keeps replay deterministic, including when two people meet head-on.
+        const offsets = [0, Math.PI / 3, -Math.PI / 3, Math.PI / 2, -Math.PI / 2];
+        const next = offsets
+          .map(
+            (angle) =>
+              [
+                npc.position[0] + Math.cos(heading + angle) * step,
+                npc.position[1] + Math.sin(heading + angle) * step,
+              ] as Point,
+          )
+          .find(clear);
+        if (!next) break;
+        npc.position = next;
+        budget -= step;
+        if (distance(npc.position, p) < 0.04) plan.path.shift();
       }
+      if (
+        plan.path.length &&
+        previousWaypoint &&
+        previousPathLength === plan.path.length &&
+        distance(npc.position, previousWaypoint) >= previousDistance - 0.01
+      ) {
+        plan.blockedSince ??= now;
+        if (now - plan.blockedSince > 4000) {
+          npc.plan = null;
+          npc.nextDecision = now + 1000;
+          continue;
+        }
+      } else plan.blockedSince = undefined;
       if (!plan.path.length) plan.phase = 'performing';
     }
     if (plan.phase === 'performing') {

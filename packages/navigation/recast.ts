@@ -9,8 +9,8 @@ export async function createNavigation(): Promise<Navigation & { dispose(): void
   const positions: number[] = [],
     indices: number[] = [];
   const step = 0.2;
-  for (let x = -6.4; x < 6.6; x += step)
-    for (let z = -5.1; z < 5.1; z += step) {
+  for (let x = -8.5; x < 8.5; x += step)
+    for (let z = -5.1; z < 7.8; z += step) {
       if (
         ![
           [x, z],
