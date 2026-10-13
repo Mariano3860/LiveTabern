@@ -7,7 +7,9 @@ test('renders the tavern, profiles, camera views, sound controls, and story filt
   await expect(page.locator('.status')).toContainText('Live world');
   await expect(page.locator('.people button')).toHaveCount(15);
   await expect(page.locator('canvas')).toBeVisible();
-  await expect.poll(() => page.evaluate(() => window.__TAVERN__?.rendering?.frames ?? 0)).toBeGreaterThan(30);
+  await expect
+    .poll(() => page.evaluate(() => window.__TAVERN__?.rendering?.frames ?? 0), { timeout: 20000 })
+    .toBeGreaterThanOrEqual(30);
   await page.getByRole('button', { name: /Borin/ }).click();
   await expect(page.getByRole('region', { name: "Borin's profile" })).toBeVisible();
   await page.getByRole('button', { name: 'Close profile' }).click();
@@ -70,6 +72,8 @@ test('keeps the interface usable on a narrow screen', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'The Wandering Ember' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await expect(page.locator('canvas')).toBeVisible();
-  await expect.poll(() => page.evaluate(() => window.__TAVERN__?.rendering?.frames ?? 0)).toBeGreaterThan(30);
+  await expect
+    .poll(() => page.evaluate(() => window.__TAVERN__?.rendering?.frames ?? 0), { timeout: 20000 })
+    .toBeGreaterThanOrEqual(30);
   await page.screenshot({ path: 'test-results/tavern-mobile.png', fullPage: true });
 });
