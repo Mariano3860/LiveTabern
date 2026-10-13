@@ -7,6 +7,8 @@ import {
   SphereGeometry,
   MeshStandardMaterial,
   Group,
+  InstancedMesh,
+  Object3D,
   PointLight,
   Vector3,
   RepeatWrapping,
@@ -18,8 +20,8 @@ import type { PublicInhabitant, PublicWorld } from '../../packages/shared/world'
 import { benches, distance, seats, tables } from '../../packages/shared/layout';
 
 const cube = new BoxGeometry(1, 1, 1),
-  cylinder = new CylinderGeometry(1, 1, 1, 10),
-  sphere = new SphereGeometry(1, 12, 8);
+  cylinder = new CylinderGeometry(1, 1, 1, 14),
+  sphere = new SphereGeometry(1, 16, 12);
 const materials = new Map<string, MeshStandardMaterial>();
 function material(color: string) {
   if (!materials.has(color)) materials.set(color, new MeshStandardMaterial({ color, roughness: 0.85 }));
@@ -158,6 +160,44 @@ function Fire({ reduced }: { reduced: boolean }) {
       <pointLight ref={light} position={[0.9, 1, 0]} color="#ffa84c" intensity={19} distance={10} />
       <Candle x={0} y={1.95} z={-0.65} />
     </group>
+  );
+}
+type Ember = { x: number; z: number; phase: number; speed: number; sway: number };
+function EmberField({ reduced }: { reduced: boolean }) {
+  const instances = useRef<InstancedMesh>(null);
+  const particle = useMemo(() => new Object3D(), []);
+  const embers = useMemo<Ember[]>(
+    () =>
+      Array.from({ length: 24 }, (_, i) => ({
+        x: -8.8 + ((i * 37) % 100) * 0.16,
+        z: -4.8 + ((i * 61) % 100) * 0.11,
+        phase: (((i * 23) % 97) / 97) * 2.3,
+        speed: 0.18 + ((i * 17) % 5) * 0.045,
+        sway: 0.08 + ((i * 19) % 5) * 0.025,
+      })),
+    [],
+  );
+  useFrame(({ clock }) => {
+    if (!instances.current) return;
+    const elapsed = reduced ? 0 : clock.elapsedTime;
+    for (const [index, ember] of embers.entries()) {
+      const rise = (elapsed * ember.speed + ember.phase) % 2.3;
+      particle.position.set(
+        ember.x + Math.sin(elapsed * 0.55 + ember.phase) * ember.sway,
+        0.55 + rise,
+        ember.z + Math.cos(elapsed * 0.37 + ember.phase) * ember.sway * 0.7,
+      );
+      particle.scale.setScalar(0.68 + (Math.sin(elapsed * 1.7 + ember.phase) + 1) * 0.12);
+      particle.updateMatrix();
+      instances.current.setMatrixAt(index, particle.matrix);
+    }
+    instances.current.instanceMatrix.needsUpdate = true;
+  });
+  return (
+    <instancedMesh ref={instances} args={[undefined, undefined, embers.length]} frustumCulled={false}>
+      <sphereGeometry args={[0.028, 8, 6]} />
+      <meshBasicMaterial color="#ffd087" transparent opacity={0.62} depthWrite={false} toneMapped={false} />
+    </instancedMesh>
   );
 }
 function Rug({
@@ -331,6 +371,7 @@ function Tavern({ reduced }: { reduced: boolean }) {
         <Chair key={i} x={x} z={z} />
       ))}
       <Fire reduced={reduced} />
+      <EmberField reduced={reduced} />
       <Barrel x={6.6} z={-4.9} scale={0.8} />
       <Barrel x={6.8} z={-3.8} scale={0.65} />
       <Barrel x={-9.2} z={-4.8} scale={0.75} />
@@ -388,7 +429,8 @@ function Person({
     stride = useRef(0);
   const initial = useRef<[number, number, number]>([npc.position[0], 0, npc.position[1]]),
     [hover, setHover] = useState(false);
-  const skin = ['#d8b58b', '#a87b59', '#bd916b', '#e2be99'][Number(npc.id.slice(4)) % 4];
+  const variant = Number(npc.id.slice(4)) || 0;
+  const skin = ['#d8b58b', '#a87b59', '#bd916b', '#e2be99'][variant % 4];
   const moving = npc.phase === 'walking',
     performing = npc.phase === 'performing';
   const sitting =
@@ -401,7 +443,10 @@ function Person({
     world.inhabitants.some(
       (other) => other.action === 'drink' && other.phase === 'performing' && other.position[1] < -2.7,
     );
-  const hair = ['#3e2b25', '#6e4b2e', '#2e3030', '#9a7951'][Number(npc.id.slice(4)) % 4];
+  const hair = ['#3e2b25', '#6e4b2e', '#2e3030', '#9a7951'][variant % 4],
+    vest = ['#6f4e3d', '#43594c', '#68524c', '#465465'][variant % 4],
+    trim = ['#d5b26d', '#b8aa7b', '#c0845c', '#96aaa0'][variant % 4],
+    cloak = ['#6c4938', '#42534b', '#5a4050', '#3f4d5f'][variant % 4];
   useFrame(({ clock }, dt) => {
     if (!group.current || !body.current) return;
     const t = clock.elapsedTime + Number(npc.id.slice(4)),
@@ -445,11 +490,15 @@ function Person({
         ? Math.abs(Math.sin(t * 4)) * 0.13
         : moving && !reduced
           ? Math.abs(gait) * 0.027
-          : Math.sin(t * 1.5) * 0.006;
+          : !reduced
+            ? Math.sin(t * 1.5) * 0.006
+            : 0;
     body.current.position.y += (bodyY - body.current.position.y) * smooth;
     body.current.rotation.z +=
       ((!reduced && dancing ? Math.sin(t * 3) * 0.16 : 0) - body.current.rotation.z) * smooth;
     body.current.rotation.x += ((sitting ? 0.08 : 0) - body.current.rotation.x) * smooth;
+    const breathing = !reduced && !moving && !performing ? Math.sin(t * 1.25) * 0.004 : 0;
+    body.current.scale.y += (1 + breathing - body.current.scale.y) * smooth;
     if (leftLeg.current)
       leftLeg.current.rotation.x +=
         ((sitting ? -1.35 : moving ? gait * 0.52 : dancing ? Math.sin(t * 4) * 0.23 : 0) -
@@ -501,11 +550,14 @@ function Person({
                       : 0.1;
     if (rightArm.current)
       rightArm.current.rotation.x += (rightGesture - rightArm.current.rotation.x) * smooth;
-    if (head.current)
+    if (head.current) {
+      const idleGlance = !reduced && !moving && !performing ? Math.sin(t * 0.31) * 0.12 : 0;
+      head.current.rotation.y += (idleGlance - head.current.rotation.y) * smooth;
       head.current.rotation.z +=
         ((performing && npc.action === 'chat' && !reduced ? Math.sin(t * 2) * 0.07 : 0) -
           head.current.rotation.z) *
         smooth;
+    }
   });
   return (
     <group
@@ -539,22 +591,40 @@ function Person({
           </group>
         </group>
         <Shape p={[0, 0.91, 0]} s={[0.29, 0.41, 0.18]} c={npc.color} />
+        <Shape p={[0, 0.98, 0.155]} s={[0.17, 0.27, 0.045]} c={vest} />
+        <Box p={[0, 0.98, 0.2]} s={[0.025, 0.3, 0.012]} c={trim} />
+        {[1.12, 1.02, 0.92, 0.82].map((y) => (
+          <Orb key={y} p={[0.035, y, 0.219]} radius={0.013} c={trim} />
+        ))}
+        {variant % 5 === 3 && (
+          <group>
+            <Shape p={[0, 1.02, -0.12]} s={[0.32, 0.42, 0.06]} c={cloak} />
+            <Shape p={[0, 1.29, 0.04]} s={[0.18, 0.065, 0.08]} c={trim} />
+            <Orb p={[0, 1.27, 0.16]} radius={0.035} c={trim} />
+          </group>
+        )}
         <Shape p={[0, 0.67, 0]} s={[0.25, 0.13, 0.18]} c="#453423" />
         <Round p={[0, 0.66, 0]} s={[0.255, 0.045, 0.19]} c="#453423" />
         <Box p={[0, 0.66, 0.18]} s={[0.11, 0.07, 0.035]} c="#d1b66b" />
         <Shape p={[0, 1.3, 0]} s={[0.1, 0.11, 0.1]} c={skin} />
-        <group ref={head} position={[0, 1.49, 0]} scale={0.6}>
+        <group ref={head} position={[0, 1.49, 0]} scale={0.68}>
           <Shape p={[0, 0, 0]} s={[0.22, 0.28, 0.21]} c={skin} />
           <mesh position={[0, 0.15, -0.015]}>
             <sphereGeometry args={[0.232, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
             <meshStandardMaterial color={hair} roughness={0.95} />
           </mesh>
+          {variant % 3 === 1 && <Shape p={[0, -0.1, -0.08]} s={[0.17, 0.18, 0.11]} c={hair} />}
+          {variant % 3 === 2 &&
+            [-1, 1].map((side) => (
+              <Shape key={side} p={[side * 0.18, -0.08, -0.005]} s={[0.055, 0.18, 0.09]} c={hair} />
+            ))}
           <Shape p={[-0.22, -0.035, 0]} s={[0.035, 0.075, 0.055]} c={skin} />
           <Shape p={[0.22, -0.035, 0]} s={[0.035, 0.075, 0.055]} c={skin} />
           {[-1, 1].map((side) => (
             <group key={side}>
               <Shape p={[side * 0.082, 0.015, 0.195]} s={[0.035, 0.026, 0.018]} c="#ded5b9" />
               <Orb p={[side * 0.082, 0.015, 0.213]} radius={0.014} c="#252722" />
+              <Orb p={[side * 0.082 - 0.004, 0.02, 0.226]} radius={0.006} c="#fff1d4" />
               <Box p={[side * 0.08, 0.075, 0.183]} s={[0.088, 0.014, 0.016]} c={hair} />
             </group>
           ))}
