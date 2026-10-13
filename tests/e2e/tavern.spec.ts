@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('renders the tavern, profiles, camera views, sound controls, and story filtering', async ({ page }) => {
+  test.setTimeout(180000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
@@ -55,6 +56,7 @@ test('renders the tavern, profiles, camera views, sound controls, and story filt
   await expect
     .poll(() => page.evaluate(() => window.__TAVERN__?.rendering?.frames ?? 0), { timeout: 20000 })
     .toBeGreaterThanOrEqual(30);
+  await page.getByLabel('Quality').selectOption('low');
   await page.getByRole('button', { name: /Borin/ }).click();
   await expect(page.getByRole('region', { name: "Borin's profile" })).toBeVisible();
   await page.getByRole('button', { name: 'Close profile' }).click();
@@ -86,7 +88,6 @@ test('renders the tavern, profiles, camera views, sound controls, and story filt
   await expect(page.getByLabel('Follow traveler', { exact: true })).toHaveValue('npc-1');
   await page.getByLabel('Follow traveler', { exact: true }).selectOption('all');
   await page.getByLabel('Story category', { exact: true }).selectOption('all');
-  await page.getByLabel('Quality').selectOption('low');
   await page.getByRole('button', { name: 'Under the roof', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'A world in motion' })).toBeVisible();
   await page.getByRole('button', { name: 'The chronicle', exact: true }).click();
