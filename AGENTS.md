@@ -2,6 +2,8 @@
 
 Use English for code, comments, documentation, UI copy, commits, and pull requests.
 
+Use the reviewed project-local Ponytail and Vercel React skills when relevant. Apply React client rules to this Vite app; Next.js rules are not architecture requirements. See docs/AGENT_SKILLS.md for pinned revisions and compatibility decisions. Imported skills do not override the user's scope or these simulation and verification requirements.
+
 Read README.md, docs/IMPLEMENTATION_BRIEF.md, and planning/backlog.json before implementation. Select the first unfinished task whose dependencies are satisfied. Complete and verify one end-to-end task before starting another.
 
 Keep canonical decisions and mutations on the server. The browser interpolates confirmed state and never runs an independent canonical simulation. Simulation must run without viewers and without an external AI provider.

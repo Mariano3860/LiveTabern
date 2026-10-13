@@ -1,4 +1,4 @@
-import React, { Component, Suspense, lazy, useEffect, useState } from 'react';
+import React, { Component, Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useWorld } from './useWorld';
 import { useAmbience } from './audio';
@@ -47,13 +47,18 @@ function App() {
   const npc = world?.inhabitants.find((n) => n.id === selected);
   const currentDuet = world?.musicGroups.find((group) => group.status !== 'resting');
   const membership = world?.musicGroups.find((group) => group.members.includes(selected ?? ''));
-  const combined = [...older, ...(world?.events ?? [])];
-  const events = [...new Map(combined.map((e) => [e.id, e])).values()]
-    .filter(
-      (e) =>
-        (filter === 'all' || e.actors.includes(filter)) && (category === 'all' || e.category === category),
-    )
-    .sort((a, b) => b.sequence - a.sequence);
+  const liveEvents = world?.events;
+  const events = useMemo(
+    () =>
+      [...new Map([...older, ...(liveEvents ?? [])].map((e) => [e.id, e])).values()]
+        .filter(
+          (e) =>
+            (filter === 'all' || e.actors.includes(filter)) &&
+            (category === 'all' || e.category === category),
+        )
+        .sort((a, b) => b.sequence - a.sequence),
+    [older, liveEvents, filter, category],
+  );
   async function loadHistory() {
     setLoadingHistory(true);
     setHistoryError('');

@@ -2,6 +2,7 @@ import { Client, type Room } from '@colyseus/sdk';
 import { useEffect, useState } from 'react';
 import type { Action, PublicWorld, Snapshot } from '../../packages/shared/world';
 import type { TavernState } from '../../packages/networking/schema';
+import { latestJson } from '../../packages/networking/json-cache';
 
 declare global {
   interface Window {
@@ -20,6 +21,10 @@ export function useWorld() {
       retry: ReturnType<typeof setTimeout> | undefined,
       room: Room<unknown, TavernState> | undefined;
     let latest: Snapshot | null = null;
+    const events = latestJson<PublicWorld['events']>([]),
+      opportunities = latestJson<PublicWorld['opportunities']>([]),
+      demands = latestJson<PublicWorld['demands']>([]),
+      musicGroups = latestJson<PublicWorld['musicGroups']>([]);
     if (import.meta.env.DEV)
       window.__TAVERN__ = { snapshot: () => (latest ? structuredClone(latest) : null) };
     const endpoint =
@@ -52,10 +57,10 @@ export function useWorld() {
         startedAt: state.startedAt,
         stock: state.stock,
         inhabitants,
-        events: JSON.parse(state.events || '[]'),
-        opportunities: JSON.parse(state.opportunities || '[]'),
-        demands: JSON.parse(state.demands || '[]'),
-        musicGroups: JSON.parse(state.musicGroups || '[]'),
+        events: events(state.events),
+        opportunities: opportunities(state.opportunities),
+        demands: demands(state.demands),
+        musicGroups: musicGroups(state.musicGroups),
       };
       latest = { world: next, viewers: state.viewers };
       setWorld(next);

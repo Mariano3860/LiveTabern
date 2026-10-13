@@ -52,3 +52,5 @@ The project intentionally omits undeclared peer packages via `.npmrc`; required 
 This is a working **local MVP**, with procedural art and deterministic social behavior. It is not a publicly hosted 24/7 service. Production PostgreSQL, richer story arcs and bands, generative dialogue, and automated capability PR generation remain future work. The renderer still has a large lazy-loaded Three.js bundle; browser correctness tests are not hardware FPS guarantees.
 
 See [implementation and acceptance evidence](docs/PROGRESS.md), [the backlog](planning/backlog.json), [architecture decisions](docs/ADR/001-local-persistence.md), and [agent instructions](AGENTS.md).
+
+Reviewed project-local [development skills](docs/AGENT_SKILLS.md) include Ponytail and Vercel React Best Practices. They guide development; they are not runtime AI providers.

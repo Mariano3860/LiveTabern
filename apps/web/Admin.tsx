@@ -49,11 +49,13 @@ export default function Admin() {
     setBusy(true);
     setError('');
     try {
-      const response = await fetch('/api/metrics', { headers: { Authorization: `Bearer ${token}` } });
+      const [response, catalogueResponse] = await Promise.all([
+        fetch('/api/metrics', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/capabilities'),
+      ]);
       if (!response.ok)
         throw new Error('Access denied. Configure ADMIN_TOKEN on the server and enter it here.');
       const nextMetrics = await response.json();
-      const catalogueResponse = await fetch('/api/capabilities');
       if (!catalogueResponse.ok) throw new Error('Could not read the capability catalogue.');
       const catalogue = await catalogueResponse.json();
       setMetrics(nextMetrics);
