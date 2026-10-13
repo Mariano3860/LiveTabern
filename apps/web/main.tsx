@@ -93,7 +93,7 @@ function App() {
     }
   }
   return (
-    <main>
+    <main className={reduced ? 'reduce-motion' : undefined}>
       <header>
         <a className="brand" href="/">
           ◈{' '}
