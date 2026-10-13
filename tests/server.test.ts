@@ -27,7 +27,7 @@ async function waitUntil<T>(read: () => Promise<T>, ready: (value: T) => boolean
   }
   throw new Error(`Service did not become ready. ${logs}`);
 }
-async function start() {
+async function start(aiMode = 'off') {
   child = spawn(process.execPath, ['--import', 'tsx', 'apps/server/index.ts'], {
     cwd: process.cwd(),
     env: {
@@ -36,6 +36,9 @@ async function start() {
       WORLD_DB: path,
       DIRECTOR_MODE: 'off',
       ADMIN_TOKEN: 'integration-only-admin-token',
+      AI_MODE: aiMode,
+      AI_DAILY_CALLS: '1',
+      AI_MONTHLY_CALLS: '2',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -85,6 +88,28 @@ it('shares one Colyseus world, advances without viewers, protects metrics, and r
   expect(two.state.inhabitants.size).toBe(15);
   expect((await fetch(`${url}/api/metrics`)).status).toBe(401);
   const auth = { Authorization: 'Bearer integration-only-admin-token', 'Content-Type': 'application/json' };
+  expect(
+    (
+      await fetch(`${url}/api/admin/ai/preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })
+    ).status,
+  ).toBe(401);
+  expect(
+    (
+      await fetch(`${url}/api/admin/ai/preview`, {
+        method: 'POST',
+        headers: auth,
+        body: JSON.stringify({ prompt: 'Overwrite inventory' }),
+      })
+    ).status,
+  ).toBe(400);
+  const offPreview = await (
+    await fetch(`${url}/api/admin/ai/preview`, { method: 'POST', headers: auth, body: '{}' })
+  ).json();
+  expect(offPreview.status).toBe('off');
   expect(
     (
       await fetch(`${url}/api/admin/director`, {
@@ -155,7 +180,7 @@ it('shares one Colyseus world, advances without viewers, protects metrics, and r
   const store = new WorldStore(path),
     saved = store.load()!;
   store.close();
-  await start();
+  await start('mock');
   const restored = await (await fetch(`${url}/api/world`)).json();
   expect(restored.version).toBeGreaterThanOrEqual(saved.version);
   expect(restored.startedAt).toBe(saved.startedAt);
@@ -168,4 +193,27 @@ it('shares one Colyseus world, advances without viewers, protects metrics, and r
     expect(loaded.inhabitants.find((n) => n.id === npc.id)?.memories.slice(0, npc.memories.length)).toEqual(
       npc.memories,
     );
+  const preview = await (
+    await fetch(`${url}/api/admin/ai/preview`, { method: 'POST', headers: auth, body: '{}' })
+  ).json();
+  expect(preview.status).toBe('ok');
+  expect(preview.source.id).toBe(preview.annotation.sourceEventId);
+  const aiMetrics = await (await fetch(`${url}/api/metrics`, { headers: auth })).json();
+  expect(aiMetrics.aiMode).toBe('mock');
+  expect(aiMetrics.aiCalls).toBe(1);
+  const observed = await (await fetch(`${url}/api/world`)).json();
+  expect(observed.events.some((event: { text: string }) => event.text === preview.annotation.caption)).toBe(
+    false,
+  );
+  await waitUntil(
+    async () => (await fetch(`${url}/api/world`)).json(),
+    (w) => w.events.at(-1).id !== preview.source.id,
+  );
+  expect(
+    (await (await fetch(`${url}/api/admin/ai/preview`, { method: 'POST', headers: auth, body: '{}' })).json())
+      .status,
+  ).toBe('budget-exhausted');
+  await stop();
+  await start('mock');
+  expect((await (await fetch(`${url}/api/metrics`, { headers: auth })).json()).aiCalls).toBe(1);
 }, 25000);

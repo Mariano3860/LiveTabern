@@ -62,12 +62,24 @@
     {
       "id": "P1-001",
       "title": "Add a budgeted optional AI gateway",
-      "status": "todo",
+      "status": "done",
       "dependencies": ["P0-005"],
       "acceptance": [
         "Validate structured outputs",
         "Enforce hard quotas and timeouts",
         "Verify off, mock, failure, and exhausted-budget behavior"
+      ]
+    },
+    {
+      "id": "P1-002",
+      "title": "Let willing musicians form persistent duets",
+      "status": "todo",
+      "dependencies": ["P1-001"],
+      "acceptance": [
+        "Require available performers, instruments, energy, and mutual consent",
+        "Keep groups, outcomes, and shared memories after restart",
+        "Show duet membership in profiles and the shared performance",
+        "Preserve solo music, action flags, and deterministic reproduction"
       ]
     }
   ]
