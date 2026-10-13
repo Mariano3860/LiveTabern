@@ -1,4 +1,4 @@
-# 005 — A shared spatial world with original visual assets
+# 005 — A shared spatial world with licensed character assets
 
 ## Decision
 
@@ -10,8 +10,12 @@ Each walking simulation step checks the next point against static walkability an
 
 ## Assets and provenance
 
-`public/textures/oak-planks.webp` and `public/textures/lime-stone.webp` were generated for this project with OpenAI's built-in image generation tool on 2026-10-13, then converted to WebP at 1024×1024 using Pillow. They are original generated assets, not copied from a third-party game, stock library, or repository. The remaining geometry, materials, and action rigs are authored in this repository using Three.js primitives. No external asset license or runtime package was introduced.
+`public/textures/oak-planks.webp` and `public/textures/lime-stone.webp` were generated for this project with OpenAI's built-in image generation tool on 2026-10-13, then converted to WebP at 1024×1024 using Pillow. They are original generated assets, not copied from a third-party game, stock library, or repository. Room geometry, environmental surfaces, tabletop props, and action poses are authored in this repository. No external runtime package was introduced.
+
+The 15 inhabitants now combine the male/female base heads from Quaternius Universal Base Characters with four compatible outfits: male/female Peasant and Ranger. The official pack pages identify the downloads as CC0 1.0 Universal; the corresponding downloaded notices remain in `public/models/characters/quaternius/`. The source archive hashes, exact pack URLs, modified texture formats/resolutions, and current 16.7 MB runtime size are recorded in `assets/PROVENANCE.md`. Textures are loaded through the existing GLTF pipeline; no runtime dependency was added. Separate cloned skeletons map walking, seated rest, serving/drinking, chat, trade, music, dance, and crafting onto each inhabitant, while server state remains authoritative.
+
+Tabletop food, game pieces, fruit, and writing materials are procedural and vary by stable table index, so the room feels populated without nondeterministic render-time placement.
 
 ## Tradeoffs
 
-This is a handcrafted, stylized 3D scene, not photogrammetry or motion-captured character animation. Articulated poses, textured surfaces, and purposeful props improve readability and consistency while avoiding a heavyweight character download for every viewer. Dynamic steering uses nearby current positions rather than a crowd planner; congested plans can pause and replan. The low-quality setting remains available for weaker devices.
+The scene and game-ready character packs remain stylized rather than photorealistic scans, and the downloaded character assets do not provide motion clips; action motion is authored against their shared skeleton. The small optimized set is downloaded once and cached by GLTFLoader, with separate skeleton instances per inhabitant. Dynamic steering uses nearby current positions rather than a crowd planner; congested plans can pause and replan. The low-quality setting remains available for weaker devices.

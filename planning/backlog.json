@@ -152,6 +152,30 @@
         "Keep inhabitants clear of furnishings and each other with deterministic server-side steering and occupied destination selection",
         "Verify persistent-world behavior, long-run simulation, and the actual desktop and mobile browser views"
       ]
+    },
+    {
+      "id": "P2-002",
+      "title": "Add licensed detailed character wardrobes and varied tabletop life",
+      "status": "done",
+      "dependencies": ["P2-001"],
+      "acceptance": [
+        "Render all 15 inhabitants with CC0 heads and rig-compatible fantasy outfits while keeping action poses independent",
+        "Animate walking, seated rest, confirmed actions, and held props on the shared skeleton",
+        "Add stable variation to food, books, and games across tavern tables",
+        "Keep optimized 2K model textures, document licenses and transformations, and verify every model variant in Chromium"
+      ]
+    },
+    {
+      "id": "P2-003",
+      "title": "Replace stiff procedural poses with a relaxed skeletal action library",
+      "status": "done",
+      "dependencies": ["P2-002"],
+      "acceptance": [
+        "Map every enabled world action to a compatible full-body animation without changing server consequences",
+        "Use root-motion-free walking with varied pace, independent phases, and coherent seat/service/drink transitions",
+        "Retain only licensed action clips used by the tavern and document exact source, digest, and transformation",
+        "Verify the animation GLB and real animated scene in unit and browser tests"
+      ]
     }
   ]
 }
