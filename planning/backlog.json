@@ -129,6 +129,17 @@
         "Reject duplicate, disabled, premature, and invalid crafting commands",
         "Observe Pip's real workshop journey, tool animation, and subsequent music in the browser"
       ]
+    },
+    {
+      "id": "P1-007",
+      "title": "Keep archive responses scoped to the current chronicle filters",
+      "status": "done",
+      "dependencies": ["P1-006"],
+      "acceptance": [
+        "Cancel old archive requests when actor or category filters change",
+        "Prevent stale responses and failures from replacing cursor, records, or loading state",
+        "Verify the next page uses the active filtered archive cursor in the browser"
+      ]
     }
   ]
 }

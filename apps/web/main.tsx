@@ -1,4 +1,4 @@
-import React, { Component, Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import React, { Component, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useWorld } from './useWorld';
 import { useAmbience } from './audio';
@@ -38,11 +38,16 @@ function App() {
     [cursor, setCursor] = useState<number | null>(null),
     [loadingHistory, setLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  const historyRequest = useRef<AbortController | null>(null);
   useAmbience(sound, world);
   useEffect(() => {
+    historyRequest.current?.abort();
+    historyRequest.current = null;
     setOlder([]);
     setCursor(null);
     setHistoryError('');
+    setLoadingHistory(false);
+    return () => historyRequest.current?.abort();
   }, [filter, category]);
   const npc = world?.inhabitants.find((n) => n.id === selected);
   const currentDuet = world?.musicGroups.find((group) => group.status !== 'resting');
@@ -60,6 +65,9 @@ function App() {
     [older, liveEvents, filter, category],
   );
   async function loadHistory() {
+    historyRequest.current?.abort();
+    const request = new AbortController();
+    historyRequest.current = request;
     setLoadingHistory(true);
     setHistoryError('');
     try {
@@ -68,15 +76,20 @@ function App() {
       });
       if (filter !== 'all') query.set('actor', filter);
       if (category !== 'all') query.set('category', category);
-      const response = await fetch(`/api/history?${query}`);
+      const response = await fetch(`/api/history?${query}`, { signal: request.signal });
       if (!response.ok) throw new Error();
       const data = (await response.json()) as { events: WorldEvent[]; nextCursor: number | null };
+      if (request.signal.aborted || historyRequest.current !== request) return;
       setOlder((previous) => [...data.events, ...previous]);
       setCursor(data.nextCursor);
     } catch {
-      setHistoryError('The archive is unavailable. Please try again.');
+      if (!request.signal.aborted && historyRequest.current === request)
+        setHistoryError('The archive is unavailable. Please try again.');
     } finally {
-      setLoadingHistory(false);
+      if (historyRequest.current === request) {
+        historyRequest.current = null;
+        if (!request.signal.aborted) setLoadingHistory(false);
+      }
     }
   }
   return (
