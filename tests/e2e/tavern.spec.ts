@@ -18,6 +18,16 @@ test('renders the tavern, profiles, camera views, sound controls, and story filt
     'aria-pressed',
     'true',
   );
+  await page.getByRole('button', { name: 'At the bar', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'At the bar', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  expect(
+    await page.evaluate(
+      () => window.__TAVERN__?.snapshot()?.world.inhabitants.find((n) => n.name === 'Borin')?.position[1],
+    ),
+  ).toBeLessThan(-4.8);
   await page.getByRole('button', { name: 'The room', exact: true }).click();
   await page.getByRole('button', { name: 'Enable sound', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Sound on', exact: true })).toHaveAttribute(

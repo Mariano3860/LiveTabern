@@ -26,6 +26,7 @@ export interface Plan {
   phase: 'walking' | 'performing';
   until: number;
   applied: boolean;
+  blockedSince?: number;
 }
 export interface Inhabitant {
   id: string;

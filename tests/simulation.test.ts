@@ -36,12 +36,71 @@ describe('authoritative simulation', () => {
       tickWorld(b, i * 250, navigation);
       const blocked = a.inhabitants.filter((n) => n.id !== 'npc-1' && !isWalkable(n.position, 0.2));
       expect(blocked.map((n) => ({ id: n.id, position: n.position, plan: n.plan }))).toEqual([]);
+      for (let first = 0; first < a.inhabitants.length; first++)
+        for (let second = first + 1; second < a.inhabitants.length; second++)
+          expect(
+            distance(a.inhabitants[first].position, a.inhabitants[second].position),
+          ).toBeGreaterThanOrEqual(0.45);
     }
     expect(a).toEqual(b);
     expect(a.inhabitants.reduce((sum, n) => sum + n.coins, 0)).toBe(money);
     expect(a.stock + a.consumedAle).toBe(a.suppliedAle);
     expect(a.inhabitants.reduce((sum, n) => sum + n.inventory.tonic, 0)).toBe(24);
     expect(a.inhabitants.every((n) => n.coins >= 0)).toBe(true);
+  });
+  it('steers around a stationary inhabitant without overlapping or losing the destination', () => {
+    const world = createWorld(0);
+    world.directorEnabled = false;
+    for (const npc of world.inhabitants) npc.nextDecision = 1e9;
+    const walker = world.inhabitants[8];
+    const blocker = world.inhabitants[6];
+    walker.position = [0, -2];
+    blocker.position = [0, -1];
+    walker.plan = {
+      id: 'command:avoidance',
+      action: 'wander',
+      destination: [0, 1],
+      path: [[0, 1]],
+      phase: 'walking',
+      until: 0,
+      applied: false,
+    };
+    walker.action = 'wander';
+    for (let now = 250; now <= 10000; now += 250) {
+      tickWorld(world, now, navigation);
+      expect(distance(walker.position, blocker.position)).toBeGreaterThanOrEqual(0.45);
+      expect(isWalkable(walker.position, 0.42)).toBe(true);
+    }
+    expect(distance(walker.position, [0, 1])).toBeLessThan(0.25);
+  });
+  it('lets two inhabitants pass each other in a narrow crossing without a collision', () => {
+    const world = createWorld(0);
+    world.directorEnabled = false;
+    for (const npc of world.inhabitants) npc.nextDecision = 1e9;
+    const [first, second] = [world.inhabitants[8], world.inhabitants[9]];
+    first.position = [-1, -2];
+    second.position = [1, -2];
+    for (const [npc, destination] of [
+      [first, [1, -2]],
+      [second, [-1, -2]],
+    ] as const) {
+      npc.action = 'wander';
+      npc.plan = {
+        id: `command:cross-${npc.id}`,
+        action: 'wander',
+        destination: [...destination],
+        path: [[...destination]],
+        phase: 'walking',
+        until: 0,
+        applied: false,
+      };
+    }
+    for (let now = 250; now <= 10000; now += 250) {
+      tickWorld(world, now, navigation);
+      expect(distance(first.position, second.position)).toBeGreaterThanOrEqual(0.45);
+    }
+    expect(distance(first.position, [1, -2])).toBeLessThan(0.25);
+    expect(distance(second.position, [-1, -2])).toBeLessThan(0.25);
   });
   it('checks location, balance, stock, and duplicate execution before selling ale', () => {
     const w = createWorld(0),

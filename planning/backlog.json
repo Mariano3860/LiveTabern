@@ -140,6 +140,18 @@
         "Prevent stale responses and failures from replacing cursor, records, or loading state",
         "Verify the next page uses the active filtered archive cursor in the browser"
       ]
+    },
+    {
+      "id": "P2-001",
+      "title": "Expand the tavern and make character motion spatially coherent",
+      "status": "done",
+      "dependencies": ["P1-007"],
+      "acceptance": [
+        "Show a larger, richly furnished room with original wood and stone textures and an identifiable innkeeper behind the counter",
+        "Blend walking, sitting, and all executable action gestures from confirmed world state",
+        "Keep inhabitants clear of furnishings and each other with deterministic server-side steering and occupied destination selection",
+        "Verify persistent-world behavior, long-run simulation, and the actual desktop and mobile browser views"
+      ]
     }
   ]
 }

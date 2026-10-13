@@ -155,9 +155,15 @@ function App() {
             </div>
           )}
           <div className="camera-controls" aria-label="Camera views">
-            {['room', 'hearth', 'stage'].map((v) => (
+            {['room', 'hearth', 'stage', 'bar'].map((v) => (
               <button key={v} aria-pressed={view === v} onClick={() => setView(v)}>
-                {v === 'room' ? 'The room' : v === 'hearth' ? 'By the fire' : 'The stage'}
+                {v === 'room'
+                  ? 'The room'
+                  : v === 'hearth'
+                    ? 'By the fire'
+                    : v === 'bar'
+                      ? 'At the bar'
+                      : 'The stage'}
               </button>
             ))}
             {npc && (
