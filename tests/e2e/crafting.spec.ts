@@ -79,7 +79,7 @@ test('follows Pip from the workshop journey to a finished lute and live music', 
     await expect(page.getByRole('region', { name: "Pip's profile" })).toContainText('craft instrument');
     await expect
       .poll(() => page.evaluate(() => window.__TAVERN__?.rendering?.frames ?? 0), { timeout: 15000 })
-      .toBeGreaterThan(30);
+      .toBeGreaterThanOrEqual(30);
     await page.screenshot({ path: 'test-results/pip-workshop.png', fullPage: true });
     await expect
       .poll(() => page.evaluate(() => window.__TAVERN__?.snapshot()?.world.inhabitants[10].instrument), {

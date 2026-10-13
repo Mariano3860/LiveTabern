@@ -1,13 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Html, OrbitControls, useTexture } from '@react-three/drei';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Canvas, createPortal, useFrame, useThree } from '@react-three/fiber';
+import { Html, OrbitControls, useGLTF, useTexture } from '@react-three/drei';
 import {
   BoxGeometry,
+  BufferGeometry,
+  AnimationMixer,
   CylinderGeometry,
+  Plane,
   SphereGeometry,
   MeshStandardMaterial,
   Group,
   InstancedMesh,
+  LoopOnce,
+  LoopRepeat,
   Object3D,
   PointLight,
   Vector3,
@@ -15,7 +20,10 @@ import {
   SRGBColorSpace,
   ACESFilmicToneMapping,
 } from 'three';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import type { AnimationAction } from 'three';
 import type { OrbitControls as Controls } from 'three-stdlib';
+import { characterAnimationFor, type CharacterAnimationPlan } from './character-animation';
 import type { PublicInhabitant, PublicWorld } from '../../packages/shared/world';
 import { benches, distance, seats, tables } from '../../packages/shared/layout';
 
@@ -83,7 +91,46 @@ function Candle({ x, y, z }: { x: number; y: number; z: number }) {
     </group>
   );
 }
-function Table({ x, z }: { x: number; z: number }) {
+function TableTreat({ variant }: { variant: number }) {
+  if (variant % 4 === 0)
+    return (
+      <group position={[-0.16, 1.03, -0.36]} rotation={[0, -0.28, 0]}>
+        <Shape p={[0, 0.02, 0]} s={[0.2, 0.11, 0.27]} c="#c89555" />
+        {[-0.11, 0, 0.11].map((x) => (
+          <Box key={x} p={[x, 0.112, 0]} s={[0.018, 0.009, 0.37]} c="#8c5a32" />
+        ))}
+        <Shape p={[0.34, -0.005, 0.04]} s={[0.11, 0.08, 0.12]} c="#dbbb73" />
+      </group>
+    );
+  if (variant % 4 === 1)
+    return (
+      <group position={[-0.15, 1.04, -0.37]} rotation={[0, 0.21, 0]}>
+        <Box p={[0, 0, 0]} s={[0.34, 0.045, 0.43]} c="#573b2b" />
+        <Box p={[0, 0.026, 0]} s={[0.3, 0.015, 0.38]} c="#c7ad7f" />
+        <Box p={[0, 0.035, 0]} s={[0.018, 0.009, 0.38]} c="#827050" />
+        <Round p={[0.31, 0.04, 0.04]} s={[0.035, 0.09, 0.035]} c="#a88f62" />
+      </group>
+    );
+  if (variant % 4 === 2)
+    return (
+      <group position={[-0.18, 1.02, -0.36]} rotation={[0, -0.15, 0]}>
+        <Box p={[-0.07, 0.012, 0]} s={[0.18, 0.025, 0.29]} c="#e0d2ae" />
+        <Box p={[0.08, 0.02, -0.03]} s={[0.18, 0.025, 0.29]} c="#874d42" />
+        <Box p={[0.28, 0.035, 0.03]} s={[0.11, 0.07, 0.11]} c="#d6c69e" />
+        <Orb p={[0.26, 0.08, 0.02]} radius={0.018} c="#7d4940" />
+        <Orb p={[0.3, 0.08, 0.045]} radius={0.018} c="#7d4940" />
+      </group>
+    );
+  return (
+    <group position={[-0.18, 1.03, -0.34]}>
+      <Round p={[0, 0, 0]} s={[0.19, 0.035, 0.19]} c="#b99560" />
+      <Orb p={[-0.045, 0.11, 0]} radius={0.105} c="#a84e36" />
+      <Orb p={[0.075, 0.09, 0.025]} radius={0.085} c="#d5ad48" />
+      <Orb p={[0.01, 0.08, -0.075]} radius={0.08} c="#66834b" />
+    </group>
+  );
+}
+function Table({ x, z, index }: { x: number; z: number; index: number }) {
   return (
     <group position={[x, 0, z]}>
       <Round p={[0, 0.92, 0]} s={[1, 0.15, 1]} c="#98673e" />
@@ -94,6 +141,7 @@ function Table({ x, z }: { x: number; z: number }) {
       <Mug p={[-0.44, 1.13, 0.18]} />
       <Mug p={[0.35, 1.13, -0.24]} />
       <Round p={[0.4, 1.01, 0.4]} s={[0.18, 0.035, 0.18]} c="#c2ad80" />
+      <TableTreat variant={index} />
     </group>
   );
 }
@@ -364,8 +412,8 @@ function Tavern({ reduced }: { reduced: boolean }) {
         <planeGeometry args={[4.2, 1.65]} />
         <meshStandardMaterial color="#854a3c" />
       </mesh>
-      {tables.map(([x, z]) => (
-        <Table key={x} x={x} z={z} />
+      {tables.map(([x, z], index) => (
+        <Table key={x} x={x} z={z} index={index} />
       ))}
       {seats.map(([x, z], i) => (
         <Chair key={i} x={x} z={z} />
@@ -404,6 +452,245 @@ function Tavern({ reduced }: { reduced: boolean }) {
     </group>
   );
 }
+type CharacterRig = {
+  root: Object3D;
+  bones: Map<string, Object3D>;
+};
+function makeCharacterRig(source: Object3D): CharacterRig {
+  const root = cloneSkinned(source);
+  const bones = new Map<string, Object3D>();
+  root.traverse((object) => {
+    if (object.name) bones.set(object.name, object);
+    if ('isMesh' in object && object.isMesh) {
+      object.castShadow = true;
+      object.receiveShadow = true;
+    }
+  });
+  return { root, bones };
+}
+const headGeometryCache = new WeakMap<BufferGeometry, BufferGeometry>();
+function headOnlyGeometry(source: BufferGeometry) {
+  const cached = headGeometryCache.get(source);
+  if (cached) return cached;
+  const positions = source.getAttribute('position');
+  const indices = source.index?.array;
+  const kept: number[] = [];
+  const triangles = indices ? indices.length / 3 : positions.count / 3;
+  for (let triangle = 0; triangle < triangles; triangle += 1) {
+    const a = indices ? indices[triangle * 3] : triangle * 3;
+    const b = indices ? indices[triangle * 3 + 1] : triangle * 3 + 1;
+    const c = indices ? indices[triangle * 3 + 2] : triangle * 3 + 2;
+    const height = (positions.getY(a) + positions.getY(b) + positions.getY(c)) / 3;
+    if (height >= 1.42) kept.push(a, b, c);
+  }
+  const geometry = source.clone();
+  geometry.clearGroups();
+  geometry.setIndex(kept);
+  headGeometryCache.set(source, geometry);
+  return geometry;
+}
+function CharacterModel({
+  variant,
+  npc,
+  action,
+  moving,
+  sitting,
+  serving,
+  reduced,
+}: {
+  variant: number;
+  npc: PublicInhabitant;
+  action: PublicInhabitant['action'] | '';
+  moving: boolean;
+  sitting: boolean;
+  serving: boolean;
+  reduced: boolean;
+}) {
+  const gender = variant % 2 === 0 ? 'female' : 'male';
+  const outfit = variant % 3 === 0 ? 'ranger' : 'peasant';
+  const base = useGLTF(`/models/characters/quaternius/${gender}-base.gltf`);
+  const clothes = useGLTF(`/models/characters/quaternius/${gender}-${outfit}.gltf`);
+  const library = useGLTF('/models/characters/quaternius/tavern-actions.glb');
+  const modelRoot = useRef<Group>(null);
+  const clippingPlane = useMemo(() => new Plane(new Vector3(0, 1, 0), -1.53), []);
+  const worldPosition = useMemo(() => new Vector3(), []);
+  const rigs = useMemo(() => {
+    const head = makeCharacterRig(base.scene);
+    const outfitRig = makeCharacterRig(clothes.scene);
+    const bodyMesh = head.root.getObjectByName(gender === 'male' ? 'SuperHero_Male' : 'Superhero_Female');
+    if (bodyMesh && 'isMesh' in bodyMesh && bodyMesh.isMesh) {
+      const skinned = bodyMesh as typeof bodyMesh & {
+        geometry: BufferGeometry;
+        material: MeshStandardMaterial | MeshStandardMaterial[];
+      };
+      skinned.geometry = headOnlyGeometry(skinned.geometry);
+      const clipMaterial = (original: MeshStandardMaterial) => {
+        const clone = original.clone();
+        clone.clippingPlanes = [clippingPlane];
+        clone.clipShadows = true;
+        return clone;
+      };
+      skinned.material = Array.isArray(skinned.material)
+        ? skinned.material.map(clipMaterial)
+        : clipMaterial(skinned.material);
+    }
+    return [head, outfitRig] as const;
+  }, [base.scene, clothes.scene, clippingPlane, gender]);
+  const mixers = useMemo(
+    () => [new AnimationMixer(rigs[0].root), new AnimationMixer(rigs[1].root)] as const,
+    [rigs],
+  );
+  const active = useRef<{ actions: [AnimationAction, AnimationAction]; plan: CharacterAnimationPlan } | null>(
+    null,
+  );
+  const repeatCountdown = useRef(0);
+  const playPlanRef = useRef<(plan: CharacterAnimationPlan) => void>(() => {});
+  const playPlan = useMemo(() => {
+    const clips = new Map(library.animations.map((clip) => [clip.name, clip]));
+    return (plan: CharacterAnimationPlan) => {
+      const clip = clips.get(plan.clip);
+      if (!clip) return;
+      const current = active.current;
+      if (
+        current?.plan.mode === plan.mode &&
+        current.plan.clip === plan.clip &&
+        current.plan.loop === plan.loop
+      )
+        return;
+      const next = mixers.map((mixer) => mixer.clipAction(clip)) as [AnimationAction, AnimationAction];
+      next.forEach((animation) => {
+        animation.reset();
+        animation.enabled = true;
+        animation.clampWhenFinished = !plan.loop;
+        animation.setLoop(plan.loop ? LoopRepeat : LoopOnce, plan.loop ? Infinity : 1);
+        animation.setEffectiveTimeScale(plan.speed);
+        animation.setEffectiveWeight(1);
+        if (plan.loop && clip.duration > 0) animation.time = (variant * 0.37) % clip.duration;
+        animation.play();
+      });
+      if (current)
+        current.actions.forEach((animation, index) => animation.crossFadeTo(next[index], 0.32, false));
+      else next.forEach((animation) => animation.fadeIn(0.32));
+      active.current = { actions: next, plan };
+      repeatCountdown.current = plan.repeatDelay ?? 0;
+    };
+  }, [library.animations, mixers, variant]);
+  playPlanRef.current = playPlan;
+
+  useEffect(() => {
+    const onFinished = (event: { action: AnimationAction }) => {
+      const current = active.current;
+      if (current?.actions[0] !== event.action || !current.plan.after) return;
+      playPlanRef.current({
+        ...current.plan,
+        clip: current.plan.after,
+        loop: true,
+        after: undefined,
+      });
+    };
+    mixers[0].addEventListener('finished', onFinished);
+    return () => {
+      mixers[0].removeEventListener('finished', onFinished);
+      mixers.forEach((mixer) => mixer.stopAllAction());
+    };
+  }, [mixers]);
+  useEffect(() => {
+    mixers.forEach((mixer) => (mixer.timeScale = reduced ? 0.72 : 1));
+  }, [mixers, reduced]);
+  const wasSitting = useRef(false);
+  useEffect(() => {
+    const plan = characterAnimationFor({
+      action: action || 'wander',
+      moving,
+      sitting,
+      serving,
+      wasSitting: wasSitting.current,
+      variant,
+      instrument: npc.instrument,
+    });
+    wasSitting.current = sitting;
+    playPlanRef.current(plan);
+  }, [action, moving, sitting, serving, variant, npc.instrument]);
+  useFrame(({ clock }, dt) => {
+    const frameDelta = Math.min(dt, 0.05);
+    mixers[0].update(frameDelta);
+    mixers[1].update(frameDelta);
+    const current = active.current;
+    if (current?.plan.loop && current.plan.repeat && current.plan.clip === 'Idle_Torch_Loop') {
+      repeatCountdown.current -= dt;
+      if (repeatCountdown.current <= 0)
+        playPlanRef.current({
+          ...current.plan,
+          clip: current.plan.repeat,
+          loop: false,
+          after: current.plan.clip,
+        });
+    }
+    if (action === 'play_music' && !reduced) {
+      const rightHand = rigs[1].bones.get('hand_r');
+      const leftHand = rigs[1].bones.get('hand_l');
+      if (rightHand) rightHand.rotation.x += Math.sin(clock.elapsedTime * 7 + variant) * 0.035;
+      if (leftHand) leftHand.rotation.z += Math.sin(clock.elapsedTime * 2.8 + variant) * 0.018;
+    }
+    if (modelRoot.current) {
+      modelRoot.current.getWorldPosition(worldPosition);
+      clippingPlane.constant = -(worldPosition.y + 1.53);
+    }
+  });
+
+  const hand = rigs[1].bones.get('hand_r');
+  return (
+    <group ref={modelRoot} scale={[0.98 + (variant % 3) * 0.02, 1, 0.98 + (variant % 3) * 0.02]}>
+      <primitive object={rigs[0].root} />
+      <primitive object={rigs[1].root} />
+      {hand &&
+        (serving || action === 'drink') &&
+        createPortal(
+          <group position={[0, -0.03, 0.025]} scale={0.58}>
+            <Mug />
+          </group>,
+          hand,
+        )}
+      {action === 'trade' &&
+        createPortal(<Round p={[0, 0, 0.03]} s={[0.055, 0.09, 0.055]} c="#b89754" />, hand ?? rigs[1].root)}
+      {action === 'craft_instrument' &&
+        createPortal(
+          <group rotation={[0.25, 0, -0.2]}>
+            <Box p={[0, 0, 0]} s={[0.035, 0.26, 0.035]} c="#69452b" />
+            <Box p={[0, -0.12, 0]} s={[0.16, 0.07, 0.075]} c="#91958e" />
+          </group>,
+          hand ?? rigs[1].root,
+        )}
+      {npc.instrument === 'lute' && action === 'play_music' && (
+        <group position={[0.11, 1.02, 0.24]} rotation={[0.12, 0, -0.45]}>
+          <mesh geometry={sphere} material={material('#a8713e')} scale={[0.18, 0.25, 0.075]} />
+          <Box p={[0, 0.29, 0]} s={[0.055, 0.43, 0.055]} c="#603c24" />
+          <Box p={[0, 0.12, 0.076]} s={[0.018, 0.55, 0.008]} c="#e4d6b6" />
+        </group>
+      )}
+      {npc.id === 'npc-1' && (
+        <group position={[0, 0.97, 0.15]}>
+          <Box p={[0, -0.12, 0]} s={[0.38, 0.54, 0.045]} c="#e0d3b7" />
+          <Box p={[0, -0.42, 0.015]} s={[0.4, 0.13, 0.055]} c="#e0d3b7" />
+          <Box p={[-0.2, 0, -0.02]} s={[0.045, 0.34, 0.035]} c="#c0aa7f" />
+          <Box p={[0.2, 0, -0.02]} s={[0.045, 0.34, 0.035]} c="#c0aa7f" />
+        </group>
+      )}
+    </group>
+  );
+}
+function CharacterPlaceholder({ npc }: { npc: PublicInhabitant }) {
+  return (
+    <group position={[npc.position[0], 0.05, npc.position[1]]}>
+      <Shape p={[0, 0.89, 0]} s={[0.25, 0.37, 0.16]} c={npc.color} />
+      <Orb p={[0, 1.48, 0]} radius={0.17} c="#d1aa7f" />
+      <Shape p={[-0.26, 0.96, 0]} s={[0.08, 0.31, 0.09]} c={npc.color} />
+      <Shape p={[0.26, 0.96, 0]} s={[0.08, 0.31, 0.09]} c={npc.color} />
+      <Shape p={[-0.12, 0.34, 0]} s={[0.085, 0.29, 0.09]} c="#493b31" />
+      <Shape p={[0.12, 0.34, 0]} s={[0.085, 0.29, 0.09]} c="#493b31" />
+    </group>
+  );
+}
 function Person({
   npc,
   world,
@@ -418,19 +705,10 @@ function Person({
   reduced: boolean;
 }) {
   const group = useRef<Group>(null),
-    body = useRef<Group>(null),
-    leftArm = useRef<Group>(null),
-    rightArm = useRef<Group>(null),
-    leftLeg = useRef<Group>(null),
-    rightLeg = useRef<Group>(null),
-    leftKnee = useRef<Group>(null),
-    rightKnee = useRef<Group>(null),
-    head = useRef<Group>(null),
-    stride = useRef(0);
+    body = useRef<Group>(null);
   const initial = useRef<[number, number, number]>([npc.position[0], 0, npc.position[1]]),
     [hover, setHover] = useState(false);
   const variant = Number(npc.id.slice(4)) || 0;
-  const skin = ['#d8b58b', '#a87b59', '#bd916b', '#e2be99'][variant % 4];
   const moving = npc.phase === 'walking',
     performing = npc.phase === 'performing';
   const sitting =
@@ -443,24 +721,15 @@ function Person({
     world.inhabitants.some(
       (other) => other.action === 'drink' && other.phase === 'performing' && other.position[1] < -2.7,
     );
-  const hair = ['#3e2b25', '#6e4b2e', '#2e3030', '#9a7951'][variant % 4],
-    vest = ['#6f4e3d', '#43594c', '#68524c', '#465465'][variant % 4],
-    trim = ['#d5b26d', '#b8aa7b', '#c0845c', '#96aaa0'][variant % 4],
-    cloak = ['#6c4938', '#42534b', '#5a4050', '#3f4d5f'][variant % 4];
   useFrame(({ clock }, dt) => {
     if (!group.current || !body.current) return;
-    const t = clock.elapsedTime + Number(npc.id.slice(4)),
-      smooth = Math.min(1, dt * 10);
-    const oldX = group.current.position.x,
-      oldZ = group.current.position.z;
-    group.current.position.x += (npc.position[0] - oldX) * smooth;
-    group.current.position.z += (npc.position[1] - oldZ) * smooth;
-    if (moving)
-      stride.current += Math.hypot(group.current.position.x - oldX, group.current.position.z - oldZ) * 9;
+    const blend = 1 - Math.exp(-dt * 9);
+    group.current.position.x += (npc.position[0] - group.current.position.x) * blend;
+    group.current.position.z += (npc.position[1] - group.current.position.z) * blend;
     const onStage =
       npc.position[0] > -7.4 && npc.position[0] < -2.6 && npc.position[1] > -5.65 && npc.position[1] < -3.45;
     group.current.position.y +=
-      ((onStage ? 0.36 : npc.id === 'npc-1' ? 0.32 : 0.05) - group.current.position.y) * smooth;
+      ((onStage ? 0.36 : npc.id === 'npc-1' ? 0.32 : 0.05) - group.current.position.y) * blend;
     let facing = group.current.rotation.y;
     if (moving)
       facing = Math.atan2(
@@ -481,83 +750,12 @@ function Person({
       facing = Math.atan2(6.2 - npc.position[0], 4.3 - npc.position[1]);
     group.current.rotation.y +=
       Math.atan2(Math.sin(facing - group.current.rotation.y), Math.cos(facing - group.current.rotation.y)) *
-      Math.min(1, dt * 7);
-    const dancing = performing && npc.action === 'dance',
-      gait = reduced ? 0 : Math.sin(stride.current);
-    const bodyY = sitting
-      ? -0.18
-      : dancing && !reduced
-        ? Math.abs(Math.sin(t * 4)) * 0.13
-        : moving && !reduced
-          ? Math.abs(gait) * 0.027
-          : !reduced
-            ? Math.sin(t * 1.5) * 0.006
-            : 0;
-    body.current.position.y += (bodyY - body.current.position.y) * smooth;
-    body.current.rotation.z +=
-      ((!reduced && dancing ? Math.sin(t * 3) * 0.16 : 0) - body.current.rotation.z) * smooth;
-    body.current.rotation.x += ((sitting ? 0.08 : 0) - body.current.rotation.x) * smooth;
-    const breathing = !reduced && !moving && !performing ? Math.sin(t * 1.25) * 0.004 : 0;
-    body.current.scale.y += (1 + breathing - body.current.scale.y) * smooth;
-    if (leftLeg.current)
-      leftLeg.current.rotation.x +=
-        ((sitting ? -1.35 : moving ? gait * 0.52 : dancing ? Math.sin(t * 4) * 0.23 : 0) -
-          leftLeg.current.rotation.x) *
-        smooth;
-    if (rightLeg.current)
-      rightLeg.current.rotation.x +=
-        ((sitting ? -1.35 : moving ? -gait * 0.52 : dancing ? -Math.sin(t * 4) * 0.23 : 0) -
-          rightLeg.current.rotation.x) *
-        smooth;
-    if (leftKnee.current)
-      leftKnee.current.rotation.x +=
-        ((sitting ? 1.37 : moving ? Math.max(0, -gait) * 0.4 : 0) - leftKnee.current.rotation.x) * smooth;
-    if (rightKnee.current)
-      rightKnee.current.rotation.x +=
-        ((sitting ? 1.37 : moving ? Math.max(0, gait) * 0.4 : 0) - rightKnee.current.rotation.x) * smooth;
-    const leftGesture = dancing
-      ? -1.45 + Math.sin(t * 4) * 0.3
-      : performing && npc.action === 'play_music'
-        ? -0.85
-        : performing && npc.action === 'craft_instrument'
-          ? -0.62
-          : performing && npc.action === 'chat'
-            ? -0.3 + Math.sin(t * 2.2) * 0.18
-            : sitting
-              ? -0.35
-              : moving
-                ? -gait * 0.36
-                : 0.1;
-    if (leftArm.current) leftArm.current.rotation.x += (leftGesture - leftArm.current.rotation.x) * smooth;
-    const rightGesture = serving
-      ? -0.85 + (reduced ? 0 : Math.sin(t * 3) * 0.18)
-      : performing && npc.action === 'drink'
-        ? -0.9 - (reduced ? 0 : Math.sin(t * 2.2) * 0.48)
-        : performing && npc.action === 'trade'
-          ? -1.05 + (reduced ? 0 : Math.sin(t * 2) * 0.12)
-          : performing && npc.action === 'craft_instrument'
-            ? -0.95 + (reduced ? 0 : Math.sin(t * 7) * 0.38)
-            : performing && npc.action === 'play_music'
-              ? -0.6 + (reduced ? 0 : Math.sin(t * 8) * 0.2)
-              : performing && npc.action === 'chat'
-                ? -0.4 + (reduced ? 0 : Math.sin(t * 2.8) * 0.25)
-                : dancing
-                  ? -1.4 - Math.sin(t * 4) * 0.3
-                  : sitting
-                    ? -0.35
-                    : moving
-                      ? gait * 0.36
-                      : 0.1;
-    if (rightArm.current)
-      rightArm.current.rotation.x += (rightGesture - rightArm.current.rotation.x) * smooth;
-    if (head.current) {
-      const idleGlance = !reduced && !moving && !performing ? Math.sin(t * 0.31) * 0.12 : 0;
-      head.current.rotation.y += (idleGlance - head.current.rotation.y) * smooth;
-      head.current.rotation.z +=
-        ((performing && npc.action === 'chat' && !reduced ? Math.sin(t * 2) * 0.07 : 0) -
-          head.current.rotation.z) *
-        smooth;
-    }
+      (1 - Math.exp(-dt * 5.5));
+    body.current.position.y += (0 - body.current.position.y) * blend;
+    body.current.rotation.set(0, 0, 0);
+    const breathing =
+      !reduced && !moving && !performing ? Math.sin(clock.elapsedTime * 1.5 + variant) * 0.003 : 0;
+    body.current.scale.y += (1 + breathing - body.current.scale.y) * blend;
   });
   return (
     <group
@@ -574,107 +772,15 @@ function Person({
       onPointerOut={() => setHover(false)}
     >
       <group ref={body}>
-        <group ref={leftLeg} position={[-0.15, 0.7, 0]}>
-          <Shape p={[0, -0.17, 0]} s={[0.115, 0.22, 0.13]} c="#3e3b35" />
-          <group ref={leftKnee} position={[0, -0.36, 0]}>
-            <Orb p={[0, 0, 0]} radius={0.105} c="#353632" />
-            <Shape p={[0, -0.19, 0]} s={[0.095, 0.22, 0.105]} c="#474842" />
-            <Shape p={[0, -0.39, 0.065]} s={[0.12, 0.095, 0.2]} c="#493225" />
-          </group>
-        </group>
-        <group ref={rightLeg} position={[0.15, 0.7, 0]}>
-          <Shape p={[0, -0.17, 0]} s={[0.115, 0.22, 0.13]} c="#3e3b35" />
-          <group ref={rightKnee} position={[0, -0.36, 0]}>
-            <Orb p={[0, 0, 0]} radius={0.105} c="#353632" />
-            <Shape p={[0, -0.19, 0]} s={[0.095, 0.22, 0.105]} c="#474842" />
-            <Shape p={[0, -0.39, 0.065]} s={[0.12, 0.095, 0.2]} c="#493225" />
-          </group>
-        </group>
-        <Shape p={[0, 0.91, 0]} s={[0.29, 0.41, 0.18]} c={npc.color} />
-        <Shape p={[0, 0.98, 0.155]} s={[0.17, 0.27, 0.045]} c={vest} />
-        <Box p={[0, 0.98, 0.2]} s={[0.025, 0.3, 0.012]} c={trim} />
-        {[1.12, 1.02, 0.92, 0.82].map((y) => (
-          <Orb key={y} p={[0.035, y, 0.219]} radius={0.013} c={trim} />
-        ))}
-        {variant % 5 === 3 && (
-          <group>
-            <Shape p={[0, 1.02, -0.12]} s={[0.32, 0.42, 0.06]} c={cloak} />
-            <Shape p={[0, 1.29, 0.04]} s={[0.18, 0.065, 0.08]} c={trim} />
-            <Orb p={[0, 1.27, 0.16]} radius={0.035} c={trim} />
-          </group>
-        )}
-        <Shape p={[0, 0.67, 0]} s={[0.25, 0.13, 0.18]} c="#453423" />
-        <Round p={[0, 0.66, 0]} s={[0.255, 0.045, 0.19]} c="#453423" />
-        <Box p={[0, 0.66, 0.18]} s={[0.11, 0.07, 0.035]} c="#d1b66b" />
-        <Shape p={[0, 1.3, 0]} s={[0.1, 0.11, 0.1]} c={skin} />
-        <group ref={head} position={[0, 1.49, 0]} scale={0.68}>
-          <Shape p={[0, 0, 0]} s={[0.22, 0.28, 0.21]} c={skin} />
-          <mesh position={[0, 0.15, -0.015]}>
-            <sphereGeometry args={[0.232, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
-            <meshStandardMaterial color={hair} roughness={0.95} />
-          </mesh>
-          {variant % 3 === 1 && <Shape p={[0, -0.1, -0.08]} s={[0.17, 0.18, 0.11]} c={hair} />}
-          {variant % 3 === 2 &&
-            [-1, 1].map((side) => (
-              <Shape key={side} p={[side * 0.18, -0.08, -0.005]} s={[0.055, 0.18, 0.09]} c={hair} />
-            ))}
-          <Shape p={[-0.22, -0.035, 0]} s={[0.035, 0.075, 0.055]} c={skin} />
-          <Shape p={[0.22, -0.035, 0]} s={[0.035, 0.075, 0.055]} c={skin} />
-          {[-1, 1].map((side) => (
-            <group key={side}>
-              <Shape p={[side * 0.082, 0.015, 0.195]} s={[0.035, 0.026, 0.018]} c="#ded5b9" />
-              <Orb p={[side * 0.082, 0.015, 0.213]} radius={0.014} c="#252722" />
-              <Orb p={[side * 0.082 - 0.004, 0.02, 0.226]} radius={0.006} c="#fff1d4" />
-              <Box p={[side * 0.08, 0.075, 0.183]} s={[0.088, 0.014, 0.016]} c={hair} />
-            </group>
-          ))}
-          <Shape p={[0, -0.08, 0.215]} s={[0.048, 0.072, 0.054]} c={skin} />
-          <Shape p={[0, -0.175, 0.179]} s={[0.075, 0.012, 0.015]} c="#75493e" />
-          {npc.id === 'npc-1' && <Shape p={[0, -0.18, 0.125]} s={[0.16, 0.1, 0.11]} c={hair} />}
-        </group>
-        <Shape p={[0, 1.1, 0.153]} s={[0.16, 0.075, 0.035]} c="#e6d4b3" />
-        {npc.id === 'npc-1' && (
-          <group>
-            <Box p={[0, 0.86, 0.195]} s={[0.36, 0.48, 0.05]} c="#d4c6a1" />
-            <Box p={[0, 0.54, 0.19]} s={[0.39, 0.16, 0.06]} c="#d4c6a1" />
-            <Box p={[-0.19, 1.07, 0.08]} s={[0.065, 0.28, 0.06]} c="#d4c6a1" />
-            <Box p={[0.19, 1.07, 0.08]} s={[0.065, 0.28, 0.06]} c="#d4c6a1" />
-          </group>
-        )}
-        {npc.role === 'Scholar' && (
-          <mesh position={[0, 1.7, -0.04]}>
-            <coneGeometry args={[0.25, 0.42, 8]} />
-            <meshStandardMaterial color={npc.color} />
-          </mesh>
-        )}
-        {npc.role === 'Ranger' && <Round p={[0, 1.72, 0]} s={[0.32, 0.08, 0.3]} c="#476241" />}
-        <group ref={leftArm} position={[-0.3, 1.05, 0]}>
-          <Shape p={[-0.025, -0.16, 0]} s={[0.11, 0.23, 0.12]} c={npc.color} />
-          <Shape p={[0, -0.39, 0]} s={[0.08, 0.16, 0.09]} c={skin} />
-          <Orb p={[0, -0.54, 0]} radius={0.075} c={skin} />
-        </group>
-        <group ref={rightArm} position={[0.3, 1.05, 0]}>
-          <Shape p={[0.025, -0.16, 0]} s={[0.11, 0.23, 0.12]} c={npc.color} />
-          <Shape p={[0, -0.39, 0]} s={[0.08, 0.16, 0.09]} c={skin} />
-          <Orb p={[0, -0.54, 0]} radius={0.075} c={skin} />
-          {(serving || (performing && npc.action === 'drink')) && <Mug p={[0, -0.56, 0.08]} />}
-          {performing && npc.action === 'trade' && (
-            <Round p={[0, -0.4, 0.08]} s={[0.07, 0.2, 0.07]} c="#75a884" />
-          )}
-          {performing && npc.action === 'craft_instrument' && (
-            <group position={[0, -0.4, 0.09]}>
-              <Box p={[0, 0, 0]} s={[0.06, 0.28, 0.06]} c="#67452b" />
-              <Box p={[0, -0.13, 0]} s={[0.2, 0.1, 0.1]} c="#939894" />
-            </group>
-          )}
-        </group>
-        {performing && npc.action === 'play_music' && npc.instrument === 'lute' && (
-          <group position={[0.08, 0.9, 0.32]} rotation={[0, 0, -0.6]}>
-            <mesh geometry={sphere} material={material('#bb8548')} scale={[0.22, 0.3, 0.08]} />
-            <Box p={[0, 0.35, 0]} s={[0.065, 0.48, 0.06]} c="#664329" />
-            <Box p={[0, 0.15, 0.08]} s={[0.025, 0.62, 0.01]} c="#d4c298" />
-          </group>
-        )}
+        <CharacterModel
+          variant={variant}
+          npc={npc}
+          action={performing ? npc.action : ''}
+          moving={moving}
+          sitting={sitting}
+          serving={serving}
+          reduced={reduced}
+        />
       </group>
       {(selected || hover) && (
         <Html position={[0, 1.95, 0]} center style={{ pointerEvents: 'none' }}>
@@ -811,11 +917,12 @@ export default function TavernScene({
   return (
     <Canvas
       shadows={quality === 'high'}
-      dpr={quality === 'high' ? [1, 1.5] : 1}
+      dpr={quality === 'high' ? [1, 1.6] : 1}
       camera={{ position: [15.5, 12.5, 20], fov: 42 }}
       onCreated={({ gl }) => {
         gl.toneMapping = ACESFilmicToneMapping;
         gl.toneMappingExposure = 1.2;
+        gl.localClippingEnabled = true;
       }}
       fallback={<div className="scene-error">WebGL is unavailable. You can still follow the chronicle.</div>}
     >
@@ -838,16 +945,22 @@ export default function TavernScene({
       <pointLight position={[0, 3.4, -0.8]} color="#ffc379" intensity={14} distance={13} />
       <pointLight position={[4.7, 2, -4.5]} color="#ffc88f" intensity={6} distance={6} />
       <Tavern reduced={reduced} />
-      {world.inhabitants.map((n) => (
-        <Person
-          key={n.id}
-          npc={n}
-          world={world}
-          selected={selected === n.id}
-          select={() => select(n.id)}
-          reduced={reduced}
-        />
-      ))}
+      <Suspense
+        fallback={world.inhabitants.map((npc) => (
+          <CharacterPlaceholder key={npc.id} npc={npc} />
+        ))}
+      >
+        {world.inhabitants.map((n) => (
+          <Person
+            key={n.id}
+            npc={n}
+            world={world}
+            selected={selected === n.id}
+            select={() => select(n.id)}
+            reduced={reduced}
+          />
+        ))}
+      </Suspense>
       <Camera view={view} selected={selected} world={world} reduced={reduced} />
       <Metrics />
     </Canvas>

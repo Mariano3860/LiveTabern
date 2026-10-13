@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "concurrently -k -n server,web \"npm run dev:server\" \"npm run dev:web\"",
     "dev:server": "tsx watch --env-file-if-exists=.env apps/server/index.ts",
+    "dev:e2e": "tsx scripts/dev-e2e.ts",
     "dev:web": "vite --host 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && vite build",
