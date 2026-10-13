@@ -49,7 +49,7 @@ Innerscene also has useful reference poses such as
 [Seated conversation](https://www.innerscene.com/tools/library/3d-parts/seated-conversation-3d-person-seated-c5931842)
 and [Seated holding a cup](https://www.innerscene.com/tools/library/3d-parts/seated-holding-a-cup-3d-person-seated-0d6b7ac6).
 These are CC0 static meshes without an armature or animation. They can guide the design of
-a taberna pose, but they cannot be played as runtime clips. Its library also lists standing
+a tavern pose, but they cannot be played as runtime clips. Its library also lists standing
 gestures, seated/resting figures, and everyday-task poses.
 
 ### Other animation sources
@@ -58,8 +58,7 @@ gestures, seated/resting figures, and everyday-task poses.
 offers a broad humanoid rigging and animation workflow. Adobe's FAQ says an Adobe ID is
 enough, and that its characters and animations may be used royalty-free in games. It is
 limited to bipedal humanoids and needs an FBX import/export step for this project. The FAQ
-was last updated in 2021, so recheck the live terms when downloading. Treat these as
-licensed project assets, not CC0 source files.
+was last updated in 2021, so recheck the live terms when downloading. Treat these as royalty-free project assets with their own terms, not CC0 files.
 
 [Quaternius Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html)
 and [Library 2](https://quaternius.com/packs/universalanimationlibrary2.html) offer 120+
