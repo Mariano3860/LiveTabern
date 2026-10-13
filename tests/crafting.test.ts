@@ -72,7 +72,7 @@ it('walks to the bench, works before consuming materials, and remembers one comp
   expect(executeAction(world, pip.id, 'play_music', `command:${++world.commandSequence}`)).toBe(true);
 });
 it('cancels disabled work and rechecks missing materials and energy without inventing instruments', () => {
-  for (const interruption of ['disabled', 'materials', 'energy'] as const) {
+  for (const interruption of ['disabled', 'materials', 'energy', 'location'] as const) {
     const { world, pip } = begin();
     if (interruption === 'disabled') world.disabledActions = ['craft_instrument'];
     if (interruption === 'materials') {
@@ -80,6 +80,7 @@ it('cancels disabled work and rechecks missing materials and energy without inve
       world.workshop.suppliedStrings = 0;
     }
     if (interruption === 'energy') pip.energy = 20;
+    if (interruption === 'location') pip.position = [3, 1];
     tickWorld(world, world.time + CRAFT_DURATION, navigation);
     expect(pip.instrument).toBe('none');
     expect(world.workshop.craftedLutes).toBe(0);
@@ -151,6 +152,19 @@ it('migrates old worlds with one auditable kit and rejects unbalanced provenance
   tickWorld(world, 500, navigation);
   expect(world.events.filter((e) => e.text.includes('workshop receives'))).toHaveLength(1);
   expect(world.workshop.wood).toBe(3);
+  for (const kits of [0, 2]) {
+    const invalid = structuredClone(world);
+    Object.assign(invalid.workshop, {
+      wood: kits * 3,
+      strings: kits,
+      suppliedWood: kits * 3,
+      suppliedStrings: kits,
+    });
+    expect(worldSchema.safeParse(invalid).success).toBe(false);
+  }
+  const undelivered = structuredClone(world);
+  undelivered.workshop.delivered = false;
+  expect(worldSchema.safeParse(undelivered).success).toBe(false);
   world.workshop.wood++;
   expect(worldSchema.safeParse(world).success).toBe(false);
   world.workshop.wood--;

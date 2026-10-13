@@ -99,3 +99,5 @@ Reopening unfinished work preserves its deadline. Review found that extended dow
 The finite starter kit and single apprentice recipe are intentional limits. Richer crafting, supplies, instrument trading, bands, and external AI remain future work. See ADR 004 for migration and execution details.
 
 TypeScript, lint, formatting, and the production build passed. The full 47-test simulation suite passed, followed by the additional crafted-instrument duet regression. All six browser tests passed together with stable source files, including reconnection and mobile layout; an earlier reconnection deadline failure passed on isolated repeat before the complete rerun. The workshop and subsequent lute-performance captures were visually inspected.
+
+PR review strengthened snapshot validation to require exactly one starter kit after delivery, added a completion interruption outside the workshop, and corrected singular material copy. CI passed the full 48-test suite and six browser tests before these review refinements; the updated head is checked again before merging.

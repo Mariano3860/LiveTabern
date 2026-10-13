@@ -146,8 +146,14 @@ export const worldSchema = z
       world.workshop.strings + world.workshop.craftedLutes !== world.workshop.suppliedStrings
     )
       ctx.addIssue({ code: 'custom', message: 'Workshop provenance does not balance' });
-    if (!world.workshop.delivered && world.workshop.suppliedWood + world.workshop.suppliedStrings > 0)
-      ctx.addIssue({ code: 'custom', message: 'Undelivered workshop must be empty' });
+    if (
+      world.workshop.suppliedWood !== (world.workshop.delivered ? 3 : 0) ||
+      world.workshop.suppliedStrings !== (world.workshop.delivered ? 1 : 0)
+    )
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Workshop must contain exactly one delivered starter kit or no supplies yet',
+      });
     if (
       world.inhabitants.filter((npc) => npc.instrument === 'lute').length !==
       1 + world.workshop.craftedLutes

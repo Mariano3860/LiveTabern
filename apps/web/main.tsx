@@ -295,7 +295,8 @@ function App() {
                     : 'An instrument waiting to be made'}
                 </strong>
                 <p>
-                  {world?.workshop.wood ?? 0} pieces of wood · {world?.workshop.strings ?? 0} sets of strings
+                  {world?.workshop.wood ?? 0} pieces of wood · {world?.workshop.strings ?? 0}{' '}
+                  {world?.workshop.strings === 1 ? 'set' : 'sets'} of strings
                 </p>
                 <small>
                   {world?.workshop.craftedLutes ?? 0} {world?.workshop.craftedLutes === 1 ? 'lute' : 'lutes'}{' '}
