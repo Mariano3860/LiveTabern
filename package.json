@@ -1,0 +1,57 @@
+{
+  "name": "livetabern",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n server,web \"npm run dev:server\" \"npm run dev:web\"",
+    "dev:server": "tsx watch --env-file-if-exists=.env apps/server/index.ts",
+    "dev:web": "vite --host 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && vite build",
+    "test": "vitest run",
+    "start": "tsx --env-file-if-exists=.env apps/server/index.ts",
+    "test:e2e": "playwright test",
+    "lint": "eslint apps packages tests *.ts",
+    "format": "prettier --write apps packages tests *.ts *.js *.json README.md AGENTS.md docs planning .agents/skills/tavern-capability/SKILL.md",
+    "format:check": "prettier --check apps packages tests *.ts *.js *.json README.md AGENTS.md docs planning .agents/skills/tavern-capability/SKILL.md"
+  },
+  "dependencies": {
+    "@colyseus/core": "^0.18.18",
+    "@colyseus/schema": "^5.0.39",
+    "@colyseus/sdk": "^0.18.5",
+    "@colyseus/ws-transport": "^0.18.4",
+    "@react-three/drei": "^10.0.0",
+    "@react-three/fiber": "^9.0.0",
+    "express": "^5.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recast-navigation": "^0.43.1",
+    "three": "^0.180.0",
+    "ws": "^8.18.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.180.0",
+    "@types/ws": "^8.18.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "concurrently": "^9.0.0",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "tsx": "^4.0.0",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.71.2",
+    "vite": "^7.0.0",
+    "vitest": "^5.0.4"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
+  }
+}
