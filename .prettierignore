@@ -1,0 +1,7 @@
+node_modules
+dist
+.local
+test-results
+playwright-report
+La_Taberna_Viva_Especificacion.md
+package-lock.json

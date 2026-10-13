@@ -1,11 +1,74 @@
 {
   "schemaVersion": 1,
   "tasks": [
-    { "id": "P0-001", "title": "Create an executable TypeScript workspace", "status": "todo", "dependencies": [], "acceptance": ["Document installation and development commands", "Start web and server entry points", "Pass typecheck, build, and a headless simulation smoke test"] },
-    { "id": "P0-002", "title": "Implement the deterministic authoritative world", "status": "todo", "dependencies": ["P0-001"], "acceptance": ["Create 15 stable inhabitants", "Inject clock and seeded randomness", "Validate seven actions and economic invariants", "Run without viewers or external AI"] },
-    { "id": "P0-003", "title": "Persist and recover confirmed progress", "status": "todo", "dependencies": ["P0-002"], "acceptance": ["Commit snapshots and unique events", "Preserve IDs, inventories, and memories after restart", "Verify bounded offline catch-up and duplicate-event handling"] },
-    { "id": "P0-004", "title": "Deliver the shared 3D tavern", "status": "todo", "dependencies": ["P0-003"], "acceptance": ["Render a stylized interior and 15 inhabitants", "Represent seven actions with movement or gestures", "Provide camera, profiles, and chronicle", "Verify two clients, no-viewer progress, and reconnection in a browser"] },
-    { "id": "P0-005", "title": "Add narrative opportunities and capability demands", "status": "todo", "dependencies": ["P0-004"], "acceptance": ["Support valid acceptance and rejection", "Persist consequences and relevant memories", "Record unsupported intentions without applying effects", "Enforce director cooldowns"] },
-    { "id": "P1-001", "title": "Add a budgeted optional AI gateway", "status": "todo", "dependencies": ["P0-005"], "acceptance": ["Validate structured outputs", "Enforce hard quotas and timeouts", "Verify off, mock, failure, and exhausted-budget behavior"] }
+    {
+      "id": "P0-001",
+      "title": "Create an executable TypeScript workspace",
+      "status": "done",
+      "dependencies": [],
+      "acceptance": [
+        "Document installation and development commands",
+        "Start web and server entry points",
+        "Pass typecheck, build, and a headless simulation smoke test"
+      ]
+    },
+    {
+      "id": "P0-002",
+      "title": "Implement the deterministic authoritative world",
+      "status": "done",
+      "dependencies": ["P0-001"],
+      "acceptance": [
+        "Create 15 stable inhabitants",
+        "Inject clock and seeded randomness",
+        "Validate seven actions and economic invariants",
+        "Run without viewers or external AI"
+      ]
+    },
+    {
+      "id": "P0-003",
+      "title": "Persist and recover confirmed progress",
+      "status": "done",
+      "dependencies": ["P0-002"],
+      "acceptance": [
+        "Commit snapshots and unique events",
+        "Preserve IDs, inventories, and memories after restart",
+        "Verify bounded offline catch-up and duplicate-event handling"
+      ]
+    },
+    {
+      "id": "P0-004",
+      "title": "Deliver the shared 3D tavern",
+      "status": "done",
+      "dependencies": ["P0-003"],
+      "acceptance": [
+        "Render a stylized interior and 15 inhabitants",
+        "Represent seven actions with movement or gestures",
+        "Provide camera, profiles, and chronicle",
+        "Verify two clients, no-viewer progress, and reconnection in a browser"
+      ]
+    },
+    {
+      "id": "P0-005",
+      "title": "Add narrative opportunities and capability demands",
+      "status": "done",
+      "dependencies": ["P0-004"],
+      "acceptance": [
+        "Support valid acceptance and rejection",
+        "Persist consequences and relevant memories",
+        "Record unsupported intentions without applying effects",
+        "Enforce director cooldowns"
+      ]
+    },
+    {
+      "id": "P1-001",
+      "title": "Add a budgeted optional AI gateway",
+      "status": "todo",
+      "dependencies": ["P0-005"],
+      "acceptance": [
+        "Validate structured outputs",
+        "Enforce hard quotas and timeouts",
+        "Verify off, mock, failure, and exhausted-budget behavior"
+      ]
+    }
   ]
 }

@@ -1,0 +1,531 @@
+import {
+  actions,
+  type Action,
+  type Inhabitant,
+  type Point,
+  type World,
+  type WorldEvent,
+} from '../shared/world';
+import { barSpots, danceSpots, distance, hearthSpots, isWalkable, seats, stageSpots } from '../shared/layout';
+export interface Navigation {
+  path(start: Point, end: Point): Point[];
+}
+const cast = [
+  ['Borin', 'Innkeeper', 'A patient host who remembers your favorite drink.', '#ac7948'],
+  ['Elena', 'Singer', 'Collects melodies and stories from passing travelers.', '#af5368'],
+  ['Finch', 'Lute player', 'A shy musician searching for a second voice.', '#58947e'],
+  ['Mara', 'Merchant', 'Arrived with tonics, bright ribbons, and a talent for bargaining.', '#c3984c'],
+  ['Orin', 'Ranger', 'Prefers the quiet corner, but never misses a good song.', '#53734e'],
+  ['Tilda', 'Herbalist', 'Listens carefully and remembers small acts of kindness.', '#8b9957'],
+  ['Rook', 'Carpenter', 'Finds comfort in sturdy furniture and honest company.', '#a87559'],
+  ['Sylva', 'Scholar', 'Writes down the little things others forget.', '#737fae'],
+  ['Dain', 'Guard', 'Off duty, with a weakness for dancing.', '#6c899c'],
+  ['Nessa', 'Traveler', 'Arrived with dusty boots and a handful of tales.', '#c07954'],
+  ['Pip', 'Apprentice', 'Curious about every instrument in the room.', '#c6a76e'],
+  ['Asha', 'Cook', 'Makes time for company after a long evening at the stove.', '#ad6047'],
+  ['Garrick', 'Blacksmith', 'Has a booming laugh and very little patience for bad ale.', '#7b8588'],
+  ['Lumi', 'Dancer', 'Hears a rhythm in almost everything.', '#9672ac'],
+  ['Edda', 'Storyteller', 'Has crossed more roads than she can count.', '#a49070'],
+];
+const starts: Point[] = [
+  [3.3, -5.1],
+  [-5.7, -4.35],
+  [-4.55, -4.35],
+  [5, 2.8],
+  [-5.3, 3.6],
+  [-4.2, 0.2],
+  [1, 2],
+  [4, 0.5],
+  [-3.4, -2.1],
+  [5.5, 1],
+  [-1.55, 3.55],
+  [4.5, -3.2],
+  [-2.6, 1.65],
+  [-4.6, -2.15],
+  [1.55, 3.55],
+];
+export function createWorld(now: number, seed = 1729): World {
+  const world: World = {
+    schemaVersion: 1,
+    id: 'wandering-ember',
+    version: 0,
+    time: now,
+    startedAt: now,
+    rng: seed,
+    sequence: 0,
+    commandSequence: 0,
+    events: [],
+    stock: 240,
+    consumedAle: 0,
+    suppliedAle: 240,
+    supplyDay: Math.floor(now / 86400000),
+    opportunities: [],
+    demands: [],
+    directorNext: now + 15000,
+    directorEnabled: true,
+    completedCommands: [],
+    directorTurn: 0,
+    disabledActions: [],
+    inhabitants: cast.map(([name, role, description, color], i) => ({
+      id: `npc-${i + 1}`,
+      name,
+      role,
+      description,
+      color,
+      position: [...starts[i]],
+      target: [...starts[i]],
+      action: 'rest',
+      energy: 65 + i,
+      thirst: 25 + i * 3,
+      coins: 16 + i,
+      sociability: 0.25 + (i % 5) * 0.15,
+      creativity: i === 1 || i === 2 ? 0.95 : 0.3 + (i % 4) * 0.15,
+      mood: 65,
+      socialNeed: 20 + i * 3,
+      inventory: { ale: 0, tonic: i === 3 ? 24 : 0 },
+      instrument: i === 1 ? 'voice' : i === 2 ? 'lute' : 'none',
+      memories: [],
+      relationships: {},
+      plan: null,
+      lastCommand: 0,
+      nextDecision: now + 1000 + i * 900,
+    })),
+  };
+  emit(world, 'system', [], 'The hearth is lit. Fifteen travelers settle into the Wandering Ember.');
+  return world;
+}
+export function random(world: World) {
+  world.rng = (Math.imul(1664525, world.rng) + 1013904223) >>> 0;
+  return world.rng / 4294967296;
+}
+export function emit(
+  world: World,
+  category: WorldEvent['category'],
+  actors: string[],
+  text: string,
+  detail?: string,
+) {
+  const event: WorldEvent = {
+    id: `${world.id}:${++world.sequence}`,
+    sequence: world.sequence,
+    time: world.time,
+    actorId: actors[0] ?? '',
+    actors,
+    category,
+    text,
+    detail,
+  };
+  world.events.push(event);
+  world.events = world.events.slice(-240);
+  if (!['wander', 'rest', 'system'].includes(category))
+    for (const id of actors) {
+      const npc = world.inhabitants.find((n) => n.id === id);
+      if (npc) {
+        npc.memories.push({
+          eventId: event.id,
+          time: event.time,
+          summary: text,
+          with: actors.filter((a) => a !== id),
+        });
+        npc.memories = npc.memories.slice(-12);
+      }
+    }
+  return event;
+}
+export function demand(world: World, npcId: string, id: string, reason: string) {
+  const existing = world.demands.find((d) => d.id === id);
+  if (existing) {
+    existing.count++;
+    existing.lastSeen = world.time;
+    existing.priority = Math.min(100, 40 + existing.count * 5);
+  } else {
+    world.demands.push({ id, actorId: npcId, count: 1, reason, priority: 45, lastSeen: world.time });
+    emit(
+      world,
+      'capability',
+      [npcId],
+      `${world.inhabitants.find((n) => n.id === npcId)?.name ?? 'A traveler'} hopes to ${id.replaceAll('_', ' ')}.`,
+      'This ability is not available; no world effect was applied.',
+    );
+  }
+}
+export function canExecute(world: World, npc: Inhabitant, action: Action, partnerId?: string): string | null {
+  if (!actions.includes(action) || world.disabledActions.includes(action)) return 'Capability is unavailable';
+  const partner = world.inhabitants.find((n) => n.id === partnerId);
+  if (action === 'drink') {
+    if (npc.coins < 1 || world.stock < 1) return 'No coins or ale available';
+    if (!barSpots.some((p) => distance(npc.position, p) < 0.55)) return 'Must reach the bar';
+  }
+  if (action === 'chat' || action === 'trade') {
+    if (!partner || partner.id === npc.id || distance(npc.position, partner.position) > 1.5)
+      return 'Partner must be nearby';
+    if (partner.plan && partner.plan.targetId !== npc.id) return 'Partner is busy';
+  }
+  if (action === 'trade' && (!partner || partner.inventory.tonic < 1 || npc.coins < 2))
+    return 'No stock or payment';
+  if (
+    action === 'play_music' &&
+    (npc.instrument === 'none' || !stageSpots.some((p) => distance(npc.position, p) < 0.65))
+  )
+    return 'Must reach the stage with an instrument or voice';
+  if (
+    action === 'dance' &&
+    !world.inhabitants.some((n) => n.action === 'play_music' && n.plan?.phase === 'performing')
+  )
+    return 'There must be live music';
+  return null;
+}
+export function executeAction(
+  world: World,
+  npcId: string,
+  action: Action,
+  commandId: string,
+  partnerId?: string,
+): boolean {
+  const npc = world.inhabitants.find((n) => n.id === npcId);
+  const commandNumber = /^command:(\d+)$/.exec(commandId);
+  if (
+    !npc ||
+    (commandNumber && Number(commandNumber[1]) <= npc.lastCommand) ||
+    world.completedCommands.includes(commandId) ||
+    canExecute(world, npc, action, partnerId)
+  )
+    return false;
+  const partner = world.inhabitants.find((n) => n.id === partnerId);
+  world.completedCommands.push(commandId);
+  world.completedCommands = world.completedCommands.slice(-2000);
+  if (commandNumber) npc.lastCommand = Number(commandNumber[1]);
+  npc.action = action;
+  if (action === 'drink') {
+    npc.coins--;
+    world.inhabitants[0].coins++;
+    world.stock--;
+    world.consumedAle++;
+    npc.thirst = Math.max(0, npc.thirst - 45);
+    npc.mood = Math.min(100, npc.mood + 3);
+    emit(
+      world,
+      action,
+      [npc.id, world.inhabitants[0].id],
+      `${npc.name} buys a mug of amber ale from Borin.`,
+      '1 coin transferred; 1 serving consumed.',
+    );
+  } else if (action === 'chat' && partner) {
+    const topics = [
+      'the roads beyond the valley',
+      'an old song they both remember',
+      'the strange lights above the mountains',
+      'a story from the market',
+      'the warmth of a familiar hearth',
+    ];
+    const topic = topics[Math.floor(random(world) * topics.length)];
+    npc.socialNeed = Math.max(0, npc.socialNeed - 30);
+    partner.socialNeed = Math.max(0, partner.socialNeed - 25);
+    npc.relationships[partner.id] = Math.min(100, (npc.relationships[partner.id] ?? 0) + 3);
+    partner.relationships[npc.id] = Math.min(100, (partner.relationships[npc.id] ?? 0) + 3);
+    partner.action = 'chat';
+    partner.nextDecision = world.time + 9000;
+    partner.plan = {
+      id: `${commandId}:partner`,
+      action: 'chat',
+      targetId: npc.id,
+      destination: [...partner.position],
+      path: [],
+      phase: 'performing',
+      until: world.time + 8000,
+      applied: true,
+    };
+    emit(
+      world,
+      action,
+      [npc.id, partner.id],
+      `${npc.name} and ${partner.name} talk about ${topic}.`,
+      'A shared memory and a little more mutual trust.',
+    );
+  } else if (action === 'trade' && partner) {
+    npc.coins -= 2;
+    partner.coins += 2;
+    partner.inventory.tonic--;
+    npc.inventory.tonic++;
+    partner.action = 'trade';
+    partner.nextDecision = world.time + 7000;
+    partner.plan = {
+      id: `${commandId}:partner`,
+      action: 'trade',
+      targetId: npc.id,
+      destination: [...partner.position],
+      path: [],
+      phase: 'performing',
+      until: world.time + 6000,
+      applied: true,
+    };
+    emit(
+      world,
+      action,
+      [npc.id, partner.id],
+      `${npc.name} buys a herbal tonic from ${partner.name}.`,
+      '2 coins and 1 tonic transferred between owners.',
+    );
+  } else if (action === 'play_music') {
+    npc.mood = Math.min(100, npc.mood + 4);
+    emit(
+      world,
+      action,
+      [npc.id],
+      npc.instrument === 'voice'
+        ? `${npc.name} sings “The Road Leads Home” by the hearthlight.`
+        : `${npc.name} fills the common room with a wandering lute melody.`,
+    );
+  } else if (action === 'dance') {
+    npc.energy = Math.max(0, npc.energy - 2);
+    npc.mood = Math.min(100, npc.mood + 5);
+    emit(world, action, [npc.id], `${npc.name} dances to the music drifting from the little stage.`);
+  } else if (action === 'rest') emit(world, action, [npc.id], `${npc.name} takes a quiet moment to rest.`);
+  return true;
+}
+export function executeIntent(
+  world: World,
+  npcId: string,
+  action: string,
+  commandId: string,
+  partnerId?: string,
+) {
+  if (!actions.includes(action as Action)) {
+    demand(world, npcId, action, 'An inhabitant requested an action outside the enabled catalogue.');
+    return false;
+  }
+  return executeAction(world, npcId, action as Action, commandId, partnerId);
+}
+export function chooseAction(npc: Inhabitant, novelty: number, disabled: Action[] = []): Action {
+  const scores: Record<Action, number> = {
+    rest: ((100 - npc.energy) / 100) * 1.4,
+    drink: npc.coins > 0 ? (npc.thirst / 100) * 1.4 : -1,
+    play_music: npc.instrument !== 'none' ? npc.creativity * 0.85 : -1,
+    dance: npc.role === 'Dancer' ? 0.8 : npc.role === 'Guard' ? 0.42 : 0.12,
+    chat: (npc.socialNeed / 100) * (0.5 + npc.sociability),
+    trade: npc.inventory.tonic === 0 && npc.coins > 3 ? 0.35 : -1,
+    wander: 0.3,
+  };
+  // Bounded novelty varies choices without replacing needs and stable personality.
+  return actions
+    .filter((action) => !disabled.includes(action))
+    .reduce(
+      (best, action) =>
+        scores[action] + ((novelty * (actions.indexOf(action) + 3)) % 1) * 0.3 >
+        scores[best] + ((novelty * (actions.indexOf(best) + 3)) % 1) * 0.3
+          ? action
+          : best,
+      actions.find((action) => !disabled.includes(action)) ?? 'wander',
+    );
+}
+function available(world: World, points: Point[], npc: Inhabitant): Point | undefined {
+  return points.find(
+    (p) => !world.inhabitants.some((n) => n.id !== npc.id && n.plan && distance(n.plan.destination, p) < 0.6),
+  );
+}
+function planAction(world: World, npc: Inhabitant, navigation: Navigation) {
+  let action = chooseAction(npc, random(world), world.disabledActions);
+  let destination: Point | undefined, targetId: string | undefined;
+  if (npc.id === 'npc-1') {
+    action = 'rest';
+    destination = [3.3, -5.1];
+  } else if (action === 'drink') destination = available(world, barSpots, npc);
+  else if (action === 'play_music') destination = available(world, stageSpots, npc);
+  else if (action === 'dance') {
+    if (world.inhabitants.some((n) => n.action === 'play_music' && n.plan?.phase === 'performing'))
+      destination = available(world, danceSpots, npc);
+  } else if (action === 'chat' || action === 'trade') {
+    const partner = world.inhabitants
+      .filter(
+        (n) =>
+          n.id !== npc.id &&
+          !n.plan &&
+          n.id !== 'npc-1' &&
+          (action !== 'trade' || (n.id === 'npc-4' && n.inventory.tonic > 0)),
+      )
+      .sort((a, b) => distance(npc.position, a.position) - distance(npc.position, b.position))[0];
+    if (partner) {
+      const angle = Math.atan2(npc.position[1] - partner.position[1], npc.position[0] - partner.position[0]);
+      const nearby: Point = [
+        partner.position[0] + Math.cos(angle) * 0.85,
+        partner.position[1] + Math.sin(angle) * 0.85,
+      ];
+      if (isWalkable(nearby)) {
+        destination = nearby;
+        targetId = partner.id;
+        partner.nextDecision = world.time + 15000;
+      }
+    }
+  } else if (action === 'rest') destination = available(world, [...seats, ...hearthSpots], npc);
+  if (!destination) {
+    action = 'wander';
+    for (let i = 0; i < 30; i++) {
+      const p: Point = [-6 + random(world) * 12.3, -4.8 + random(world) * 9.6];
+      if (isWalkable(p, 0.55)) {
+        destination = p;
+        break;
+      }
+    }
+  }
+  if (!destination) {
+    npc.nextDecision = world.time + 1000;
+    return;
+  }
+  const path = npc.id === 'npc-1' ? [] : navigation.path(npc.position, destination);
+  if (distance(npc.position, destination) > 0.25 && !path.length) {
+    npc.nextDecision = world.time + 2000;
+    return;
+  }
+  npc.target = destination;
+  npc.action = action;
+  npc.plan = {
+    id: `command:${++world.commandSequence}`,
+    action,
+    targetId,
+    destination,
+    path,
+    phase: path.length ? 'walking' : 'performing',
+    until: 0,
+    applied: false,
+  };
+}
+export function offerOpportunity(world: World, kind: 'music' | 'market' | 'hearth') {
+  const id = `opportunity:${world.version}:${world.opportunities.length}`;
+  const titles = {
+    music: 'A song for the road',
+    market: 'A merchant’s invitation',
+    hearth: 'Stories around the fire',
+  };
+  const opportunity = {
+    id,
+    kind,
+    created: world.time,
+    expires: world.time + 75000,
+    status: 'open' as const,
+    cast: [] as string[],
+    title: titles[kind],
+  };
+  world.opportunities.push(opportunity);
+  world.opportunities = world.opportunities.slice(-12);
+  emit(
+    world,
+    'story',
+    [],
+    kind === 'music'
+      ? 'A passing traveler asks whether anyone knows a song for the long road home.'
+      : kind === 'market'
+        ? 'Mara offers to share the stories behind her wares.'
+        : 'The fire settles low. There is room for an old story beside the hearth.',
+  );
+  return opportunity;
+}
+export function respondToOpportunity(world: World, id: string, npcId: string, accept: boolean) {
+  const opportunity = world.opportunities.find(
+    (o) => o.id === id && o.status === 'open' && o.expires > world.time,
+  );
+  const npc = world.inhabitants.find((n) => n.id === npcId);
+  if (!opportunity || !npc) return false;
+  opportunity.status = accept ? 'accepted' : 'declined';
+  opportunity.cast = [npcId];
+  opportunity.outcome = accept ? `${npc.name} takes an interest.` : `${npc.name} prefers a quiet evening.`;
+  emit(world, 'story', [npcId], opportunity.outcome);
+  if (accept) {
+    npc.socialNeed = Math.min(100, npc.socialNeed + 15);
+    if (opportunity.kind === 'music' && npc.instrument !== 'none') npc.nextDecision = world.time;
+  }
+  return true;
+}
+export function tickWorld(world: World, now: number, navigation: Navigation): WorldEvent[] {
+  if (now <= world.time) return [];
+  const elapsed = Math.min((now - world.time) / 1000, 1),
+    sequence = world.sequence;
+  world.time = now;
+  world.version++;
+  const day = Math.floor(now / 86400000);
+  if (day > world.supplyDay) {
+    world.supplyDay = day;
+    world.stock += 240;
+    world.suppliedAle += 240;
+    emit(world, 'system', ['npc-1'], 'The morning delivery brings 240 servings of fresh ale.');
+  }
+  for (const npc of world.inhabitants) {
+    npc.thirst = Math.min(100, npc.thirst + elapsed * 0.18);
+    npc.socialNeed = Math.min(100, npc.socialNeed + elapsed * 0.13);
+    npc.energy = Math.max(
+      0,
+      Math.min(
+        100,
+        npc.energy + (npc.plan?.phase === 'performing' && npc.action === 'rest' ? 0.5 : -0.035) * elapsed,
+      ),
+    );
+    const plan = npc.plan;
+    if (!plan && now >= npc.nextDecision) {
+      planAction(world, npc, navigation);
+      continue;
+    }
+    if (!plan) continue;
+    if (plan.phase === 'walking') {
+      let budget = elapsed * (npc.role === 'Apprentice' ? 1.05 : 0.85);
+      while (plan.path.length && budget > 0) {
+        const p = plan.path[0],
+          d = distance(npc.position, p);
+        if (d <= budget) {
+          npc.position = [...p];
+          plan.path.shift();
+          budget -= d;
+        } else {
+          npc.position = [
+            npc.position[0] + ((p[0] - npc.position[0]) / d) * budget,
+            npc.position[1] + ((p[1] - npc.position[1]) / d) * budget,
+          ];
+          budget = 0;
+        }
+      }
+      if (!plan.path.length) plan.phase = 'performing';
+    }
+    if (plan.phase === 'performing') {
+      if (!plan.applied) {
+        if (!executeAction(world, npc.id, plan.action, plan.id, plan.targetId)) {
+          npc.plan = null;
+          npc.nextDecision = now + 4000;
+          continue;
+        }
+        plan.applied = true;
+        plan.until = now + (plan.action === 'play_music' ? 32000 : plan.action === 'rest' ? 16000 : 8000);
+      }
+      if (now >= plan.until) {
+        npc.plan = null;
+        npc.nextDecision = now + 2000 + random(world) * 5000;
+      }
+    }
+  }
+  if (world.directorEnabled && now >= world.directorNext) {
+    const kinds = ['music', 'market', 'hearth'] as const;
+    const opportunity = offerOpportunity(world, kinds[world.directorTurn++ % 3]);
+    const candidate = world.inhabitants.find((n) =>
+      opportunity.kind === 'music' ? n.instrument !== 'none' : n.sociability > 0.6,
+    )!;
+    respondToOpportunity(
+      world,
+      opportunity.id,
+      candidate.id,
+      candidate.energy > 40 &&
+        random(world) < (opportunity.kind === 'music' ? candidate.creativity : candidate.sociability),
+    );
+    if (opportunity.kind === 'music')
+      demand(
+        world,
+        'npc-11',
+        'craft_instrument',
+        'Pip would like to join the musicians, but instrument crafting has not been implemented.',
+      );
+    world.directorNext = now + 120000;
+  }
+  for (const opportunity of world.opportunities)
+    if (opportunity.expires <= now && opportunity.status !== 'resolved') {
+      opportunity.status = 'resolved';
+      opportunity.outcome ??= 'The moment passes quietly.';
+      emit(world, 'story', opportunity.cast, `${opportunity.title}: ${opportunity.outcome}`);
+    }
+  return world.events.filter((event) => event.sequence > sequence);
+}
