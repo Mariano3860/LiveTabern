@@ -35,6 +35,18 @@ export function useAmbience(enabled: boolean, world: PublicWorld | null) {
       gain.connect(audio.destination);
       tone.start();
       tone.stop(audio.currentTime + 0.5);
+      if (w.musicGroups.some((group) => group.status === 'performing')) {
+        const harmony = audio.createOscillator(),
+          harmonyGain = audio.createGain();
+        harmony.type = 'sine';
+        harmony.frequency.value = notes[step] * 1.5;
+        harmonyGain.gain.setValueAtTime(0.015, audio.currentTime);
+        harmonyGain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.4);
+        harmony.connect(harmonyGain);
+        harmonyGain.connect(audio.destination);
+        harmony.start();
+        harmony.stop(audio.currentTime + 0.45);
+      }
     }
     void audio.resume();
     const timer = setInterval(play, 550);

@@ -28,6 +28,12 @@ export function restoreWorld(store: WorldStore, now: number, navigation: Navigat
       npc.nextDecision += skipped;
     }
     previous.directorNext += skipped;
+    previous.musicNext += skipped;
+    for (const group of previous.musicGroups)
+      if (group.status !== 'resting') {
+        group.until += skipped;
+        if (group.status === 'performing') group.startedAt += skipped;
+      }
     emit(
       previous,
       'system',

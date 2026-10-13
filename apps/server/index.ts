@@ -1,4 +1,5 @@
 import { Server, Room, ServerError, matchMaker } from '@colyseus/core';
+import { Encoder } from '@colyseus/schema';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import express from 'express';
 import { existsSync } from 'node:fs';
@@ -16,6 +17,8 @@ import { publicWorld, capabilityCatalogue } from '../../packages/shared/world';
 import { PersonState, TavernState } from '../../packages/networking/schema';
 
 const aiConfig = configFromEnvironment(process.env);
+// The bounded public chronicle and fifteen profiles exceed the encoder's small default allocation.
+Encoder.BUFFER_SIZE = 128 * 1024;
 const navigation = await createNavigation();
 const aiLedger = new AiLedger(resolve(process.env.WORLD_DB ?? '.local/world.sqlite'));
 const ai = new NarrativeGateway(aiConfig, aiLedger, mockProvider);
@@ -77,6 +80,7 @@ class TavernRoom extends Room<{ state: TavernState }> {
     this.state.events = JSON.stringify(view.events.slice(-80));
     this.state.opportunities = JSON.stringify(view.opportunities);
     this.state.demands = JSON.stringify(view.demands);
+    this.state.musicGroups = JSON.stringify(view.musicGroups);
   }
 }
 function authorized(header?: string) {

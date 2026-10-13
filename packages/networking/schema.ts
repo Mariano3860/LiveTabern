@@ -33,6 +33,7 @@ export const TavernState = schema(
     events: t.string(),
     opportunities: t.string(),
     demands: t.string(),
+    musicGroups: t.string(),
   },
   'TavernWorld',
 );

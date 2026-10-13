@@ -55,6 +55,7 @@ export function useWorld() {
         events: JSON.parse(state.events || '[]'),
         opportunities: JSON.parse(state.opportunities || '[]'),
         demands: JSON.parse(state.demands || '[]'),
+        musicGroups: JSON.parse(state.musicGroups || '[]'),
       };
       latest = { world: next, viewers: state.viewers };
       setWorld(next);

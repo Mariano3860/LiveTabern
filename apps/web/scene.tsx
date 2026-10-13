@@ -380,7 +380,32 @@ function Person({
         <Html position={[0, 1.95, 0]} center style={{ pointerEvents: 'none' }}>
           <div className="npc-label">
             <strong>{npc.name}</strong>
-            <span>{moving ? 'Walking' : npc.action.replaceAll('_', ' ')}</span>
+            <span>
+              {moving
+                ? 'Walking'
+                : npc.phase === 'idle'
+                  ? 'Taking a moment'
+                  : npc.action.replaceAll('_', ' ')}
+            </span>
+            {world.musicGroups.find(
+              (music) => music.status !== 'resting' && music.members.includes(npc.id),
+            ) && (
+              <span>
+                Duet with{' '}
+                {
+                  world.inhabitants.find(
+                    (other) =>
+                      other.id !== npc.id &&
+                      world.musicGroups.some(
+                        (music) =>
+                          music.status !== 'resting' &&
+                          music.members.includes(npc.id) &&
+                          music.members.includes(other.id),
+                      ),
+                  )?.name
+                }
+              </span>
+            )}
           </div>
         </Html>
       )}

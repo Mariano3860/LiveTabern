@@ -98,10 +98,44 @@ export const worldSchema = z
     completedCommands: z.array(z.string()),
     directorTurn: z.number().int().nonnegative().default(0),
     disabledActions: z.array(z.enum(actions)).default([]),
+    musicNext: z.number().default(0),
+    musicGroups: z
+      .array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          members: z.tuple([z.string(), z.string()]),
+          commandIds: z.tuple([z.string(), z.string()]),
+          status: z.enum(['gathering', 'performing', 'resting']),
+          created: z.number(),
+          startedAt: z.number(),
+          until: z.number(),
+          performances: z.number().int().nonnegative(),
+          outcome: z.string(),
+        }),
+      )
+      .max(8)
+      .default([]),
   })
   .superRefine((world, ctx) => {
     if (new Set(world.inhabitants.map((n) => n.id)).size !== 15)
       ctx.addIssue({ code: 'custom', message: 'Duplicate inhabitant identities' });
     if (world.stock + world.consumedAle !== world.suppliedAle)
       ctx.addIssue({ code: 'custom', message: 'Ale provenance does not balance' });
+    const activeMembers = new Set<string>();
+    for (const group of world.musicGroups) {
+      if (
+        new Set(group.members).size !== 2 ||
+        group.members.some((id) => !world.inhabitants.some((n) => n.id === id))
+      )
+        ctx.addIssue({ code: 'custom', message: 'Invalid duet members' });
+      if (group.status !== 'resting')
+        for (const id of group.members) {
+          if (activeMembers.has(id))
+            ctx.addIssue({ code: 'custom', message: 'A musician belongs to overlapping performances' });
+          activeMembers.add(id);
+        }
+    }
+    if (new Set(world.musicGroups.map((g) => g.id)).size !== world.musicGroups.length)
+      ctx.addIssue({ code: 'custom', message: 'Duplicate music group identities' });
   });

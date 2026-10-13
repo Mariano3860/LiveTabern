@@ -73,13 +73,25 @@
     {
       "id": "P1-002",
       "title": "Let willing musicians form persistent duets",
-      "status": "todo",
+      "status": "done",
       "dependencies": ["P1-001"],
       "acceptance": [
         "Require available performers, instruments, energy, and mutual consent",
         "Keep groups, outcomes, and shared memories after restart",
         "Show duet membership in profiles and the shared performance",
         "Preserve solo music, action flags, and deterministic reproduction"
+      ]
+    },
+    {
+      "id": "P1-003",
+      "title": "Sustain tavern needs and its closed economy across many days",
+      "status": "todo",
+      "dependencies": ["P1-002"],
+      "acceptance": [
+        "Keep purchases, social activity, and music occurring after the initial days",
+        "Transfer rewards from existing owners without creating money",
+        "Replenish ale through auditable timed supply events",
+        "Verify bounded state and resource conservation during long-running simulation"
       ]
     }
   ]

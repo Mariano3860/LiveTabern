@@ -70,6 +70,19 @@ export interface CapabilityDemand {
   priority: number;
   lastSeen: number;
 }
+export interface MusicGroup {
+  id: string;
+  name: string;
+  members: [string, string];
+  commandIds: [string, string];
+  status: 'gathering' | 'performing' | 'resting';
+  created: number;
+  startedAt: number;
+  until: number;
+  performances: number;
+  outcome: string;
+}
+export type PublicMusicGroup = Omit<MusicGroup, 'commandIds'>;
 export interface World {
   schemaVersion: 1;
   id: string;
@@ -92,6 +105,8 @@ export interface World {
   completedCommands: string[];
   directorTurn: number;
   disabledActions: Action[];
+  musicGroups: MusicGroup[];
+  musicNext: number;
 }
 export type PublicInhabitant = Pick<
   Inhabitant,
@@ -118,6 +133,7 @@ export interface PublicWorld {
   opportunities: Opportunity[];
   demands: CapabilityDemand[];
   stock: number;
+  musicGroups: PublicMusicGroup[];
 }
 export interface Snapshot {
   world: PublicWorld;
@@ -160,12 +176,16 @@ export function publicWorld(world: World): PublicWorld {
       energy: n.energy,
       mood: n.mood,
       instrument: n.instrument,
-      phase: n.plan?.phase ?? 'idle',
+      phase: n.plan?.phase === 'performing' && !n.plan.applied ? 'idle' : (n.plan?.phase ?? 'idle'),
       partnerId: n.plan?.targetId,
       until: n.plan?.until ?? 0,
     })),
     events: world.events,
     opportunities: world.opportunities,
     demands: world.demands,
+    musicGroups: world.musicGroups.map(({ commandIds: _commands, ...group }) => ({
+      ...group,
+      members: [...group.members] as [string, string],
+    })),
   };
 }

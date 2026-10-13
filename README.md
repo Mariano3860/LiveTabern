@@ -19,6 +19,8 @@ No model API keys or paid services are required. External AI is off.
 
 Drag to orbit, scroll to zoom, and select a traveler or their card. Try the fireside and stage cameras, follow a character, filter the chronicle, or read earlier events. Sound is opt-in. Low graphics quality and reduced motion are available.
 
+Willing musicians can form a persistent duet, walk to separate places on the stage, and begin a shared performance once both arrive. Watch the performance banner, open a musician's profile, or use **Under the roof** to see their group's history. Duets add a synthesized harmony when sound is enabled. The current cast supports Elena and Finch; larger bands and new instruments remain future work.
+
 ## Persistence and administration
 
 The local world is stored in `.local/world.sqlite`, outside Git. Restarting restores confirmed progress, including identities, inventories, memories, and relationships. Recovery replays at most five minutes of downtime and explicitly records longer skipped intervals; the server must be running for continuous simulation.
