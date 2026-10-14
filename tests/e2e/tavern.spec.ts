@@ -5,6 +5,8 @@ test('renders the tavern, profiles, camera views, sound controls, and story filt
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
+  // Exercise the full spectator journey with low quality on the software WebGL runner.
+  await page.getByLabel('Quality').selectOption('low');
   await expect(page.locator('.status')).toContainText('Live world');
   await expect(page.locator('.people button')).toHaveCount(15);
   await expect(page.locator('canvas')).toBeVisible();
@@ -58,7 +60,6 @@ test('renders the tavern, profiles, camera views, sound controls, and story filt
   await expect
     .poll(() => page.evaluate(() => window.__TAVERN__?.rendering?.frames ?? 0), { timeout: 20000 })
     .toBeGreaterThanOrEqual(30);
-  await page.getByLabel('Quality').selectOption('low');
   await page.getByRole('button', { name: /Borin/ }).click();
   await expect(page.getByRole('region', { name: "Borin's profile" })).toBeVisible();
   await page.getByRole('button', { name: 'Close profile' }).click();
