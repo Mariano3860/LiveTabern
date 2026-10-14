@@ -26,6 +26,7 @@ export function restoreWorld(store: WorldStore, now: number, navigation: Navigat
     for (const npc of previous.inhabitants) {
       if (npc.plan && npc.plan.until > 0) npc.plan.until += skipped;
       if (npc.plan?.blockedSince) npc.plan.blockedSince += skipped;
+      if (npc.plan?.departAt) npc.plan.departAt += skipped;
       npc.nextDecision += skipped;
     }
     previous.directorNext += skipped;

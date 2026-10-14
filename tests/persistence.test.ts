@@ -20,6 +20,26 @@ function database() {
   return join(folder, 'world.sqlite');
 }
 describe('transactional world recovery', () => {
+  it('retains a pending seat departure on reopening', () => {
+    const path = database(),
+      store = new WorldStore(path),
+      world = createWorld(0);
+    world.inhabitants[8].plan = {
+      id: 'departure',
+      action: 'wander',
+      destination: [-8, 0],
+      path: [[-8, 0]],
+      phase: 'walking',
+      until: 0,
+      applied: false,
+      departAt: 1800,
+    };
+    store.save(world, world.events);
+    store.close();
+    const reopened = new WorldStore(path);
+    expect(reopened.load()!.inhabitants[8].plan?.departAt).toBe(1800);
+    reopened.close();
+  });
   it('preserves IDs, plans, money, memories, and unique events on reopening', () => {
     const path = database(),
       store = new WorldStore(path),

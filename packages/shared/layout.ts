@@ -1,4 +1,5 @@
-import type { Point } from './world';
+import type { Action, Point } from './world';
+export const usesChairPose = (action: Action) => action === 'rest' || action === 'chat' || action === 'trade';
 export const tables: Point[] = [
   [-2.6, 0],
   [2.4, 0.3],
@@ -28,12 +29,12 @@ export const seats: Point[] = [
   [-1.55, 3.55],
   [1.55, 3.55],
   [0, 5],
-  [-7.2, 5.9],
-  [-5.8, 7.35],
-  [-4.35, 5.9],
-  [3.25, 6],
-  [4.7, 7.4],
-  [6.15, 6],
+  [-4.1, 5.9],
+  [-4.6, 7.1],
+  [-4.6, 4.7],
+  [3, 6],
+  [3.5, 7.2],
+  [3.5, 4.8],
 ];
 export const stageSpots: Point[] = [
   [-5.7, -4.35],
@@ -57,7 +58,44 @@ export function isWalkable([x, z]: Point, margin = 0.35): boolean {
   if (x > 7.3 && z < -4.4) return false;
   if (benches.some(([bx, bz]) => Math.abs(x - bx) < 0.85 + margin && Math.abs(z - bz) < 0.35 + margin))
     return false;
-  return !tables.some(([tx, tz]) => Math.hypot(x - tx, z - tz) < 1 + margin);
+  return !tables.some(([tx, tz]) => (x - tx) ** 2 + (z - tz) ** 2 < (1 + margin) ** 2);
 }
 export const distance = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+// Includes the chair footprint, its short pullback, and a travel clearance.
+export const chairClearance = 0.68;
+export function isTravelWalkable(point: Point): boolean {
+  return (
+    isWalkable(point, 0.42) &&
+    seats.every((seat) => (point[0] - seat[0]) ** 2 + (point[1] - seat[1]) ** 2 >= chairClearance ** 2)
+  );
+}
+export function isTravelSegmentClear(from: Point, to: Point, assignedSeat?: Point): boolean {
+  const length = distance(from, to);
+  const samples = Math.max(1, Math.ceil(length / 0.08));
+  for (let i = 1; i <= samples; i++) {
+    const point: Point = [
+      from[0] + ((to[0] - from[0]) * i) / samples,
+      from[1] + ((to[1] - from[1]) * i) / samples,
+    ];
+    if (!isWalkable(point, 0.42)) return false;
+  }
+  const dx = to[0] - from[0],
+    dz = to[1] - from[1];
+  for (const seat of seats) {
+    if (assignedSeat && (seat[0] - assignedSeat[0]) ** 2 + (seat[1] - assignedSeat[1]) ** 2 < 0.02 ** 2)
+      continue;
+    const sx = from[0] - seat[0],
+      sz = from[1] - seat[1];
+    // Arrival tolerates 4 cm around the anchor; tiny offsets must not trap a seated actor.
+    // Larger overlaps may only escape outward.
+    if (
+      sx * sx + sz * sz < 0.08 ** 2 ||
+      (sx * sx + sz * sz < chairClearance ** 2 && sx * dx + sz * dz >= -0.000001)
+    )
+      continue;
+    const t = length > 0 ? Math.max(0, Math.min(1, -(sx * dx + sz * dz) / (length * length))) : 0;
+    if ((sx + dx * t) ** 2 + (sz + dz * t) ** 2 < (chairClearance - 0.000001) ** 2) return false;
+  }
+  return true;
+}
 export const workbenchSpot: Point = [6.2, 3.1];

@@ -6,15 +6,17 @@ import { join } from 'node:path';
 import { test, expect } from '@playwright/test';
 import { createWorld } from '../../packages/simulation/engine';
 import { WorldStore } from '../../packages/persistence/store';
+import { actions } from '../../packages/shared/world';
 
 test('follows Pip from the workshop journey to a finished lute and live music', async ({ page }) => {
-  test.setTimeout(90000);
+  test.setTimeout(180000);
   const folder = mkdtempSync(join(tmpdir(), 'livetabern-crafting-browser-'));
   const database = join(folder, 'world.sqlite');
   const world = createWorld(Date.now());
   world.directorEnabled = false;
+  world.disabledActions = [...actions];
   world.musicNext = world.time + 120000;
-  for (const npc of world.inhabitants) npc.nextDecision = world.time + 120000;
+  for (const npc of world.inhabitants) npc.nextDecision = world.time + 3600000;
   world.inhabitants[1].position = [0, -2.5];
   world.inhabitants[2].position = [5, 1];
   const pip = world.inhabitants[10];
@@ -42,6 +44,7 @@ test('follows Pip from the workshop journey to a finished lute and live music', 
       WORLD_DB: database,
       AI_MODE: 'off',
       DIRECTOR_MODE: 'off',
+      ADMIN_TOKEN: 'crafting-browser-test-token',
     });
     start(['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '5175', '--strictPort'], {
       VITE_WORLD_URL: 'http://127.0.0.1:33119',
@@ -59,9 +62,21 @@ test('follows Pip from the workshop journey to a finished lute and live music', 
       )
       .toBe(200);
     await page.goto('http://127.0.0.1:5175');
+    await page.getByLabel('Quality').selectOption('low');
     await expect(page.locator('.people button')).toHaveCount(15);
+    await expect
+      .poll(() => page.evaluate(() => window.__TAVERN__?.rendering?.frames ?? 0), { timeout: 60000 })
+      .toBeGreaterThanOrEqual(30);
     await page.getByRole('button', { name: /Pip.*Apprentice/ }).click();
     await page.getByRole('button', { name: 'Follow Pip', exact: true }).click();
+    const craftEnabled = await page.request.post(
+      'http://127.0.0.1:33119/api/admin/capabilities/craft_instrument',
+      {
+        headers: { Authorization: 'Bearer crafting-browser-test-token' },
+        data: { enabled: true },
+      },
+    );
+    expect(craftEnabled.status()).toBe(200);
     await expect
       .poll(() => page.evaluate(() => window.__TAVERN__?.snapshot()?.world.inhabitants[10].phase), {
         timeout: 20000,
@@ -86,6 +101,11 @@ test('follows Pip from the workshop journey to a finished lute and live music', 
         timeout: 20000,
       })
       .toBe('lute');
+    const musicEnabled = await page.request.post('http://127.0.0.1:33119/api/admin/capabilities/play_music', {
+      headers: { Authorization: 'Bearer crafting-browser-test-token' },
+      data: { enabled: true },
+    });
+    expect(musicEnabled.status()).toBe(200);
     await expect
       .poll(
         () =>

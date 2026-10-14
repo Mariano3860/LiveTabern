@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { seats } from '../../packages/shared/layout';
 
 test('renders the tavern, profiles, camera views, sound controls, and story filtering', async ({ page }) => {
   test.setTimeout(180000);
@@ -60,6 +61,26 @@ test('renders the tavern, profiles, camera views, sound controls, and story filt
   await expect
     .poll(() => page.evaluate(() => window.__TAVERN__?.rendering?.frames ?? 0), { timeout: 20000 })
     .toBeGreaterThanOrEqual(30);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          (points) =>
+            window.__TAVERN__
+              ?.snapshot()
+              ?.world.inhabitants.some(
+                (npc) =>
+                  npc.action === 'rest' &&
+                  npc.phase === 'performing' &&
+                  points.some(
+                    (seat) => Math.hypot(npc.position[0] - seat[0], npc.position[1] - seat[1]) < 0.02,
+                  ),
+              ),
+          seats,
+        ),
+      { timeout: 40000 },
+    )
+    .toBe(true);
   await page.getByRole('button', { name: /Borin/ }).click();
   await expect(page.getByRole('region', { name: "Borin's profile" })).toBeVisible();
   await page.getByRole('button', { name: 'Close profile' }).click();

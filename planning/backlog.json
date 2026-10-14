@@ -188,6 +188,31 @@
         "Follow an actual participant from the catalogue with profile and camera controls",
         "Verify live counts, activity changes, keyboard use, and narrow-screen layout in Chromium"
       ]
+    },
+    {
+      "id": "P2-005",
+      "title": "Align chair destinations and choreograph sitting and standing",
+      "status": "done",
+      "dependencies": ["P2-004"],
+      "acceptance": [
+        "Route all fifteen seats to their exact points only when the final approach is clear",
+        "Keep every chair reachable around the tables without table or wall overlap",
+        "Ease chairs back for arrival and departure and settle them under seated guests",
+        "Keep chair movement presentation-only and disable it in reduced-motion mode",
+        "Verify the chair sequence, exact seat arrival, and real 3D Chromium scene"
+      ]
+    },
+    {
+      "id": "P2-006",
+      "title": "Ground character motion and improve action contact",
+      "status": "pending",
+      "dependencies": ["P2-005"],
+      "acceptance": [
+        "Reduce foot sliding during walking and turning across the full cast",
+        "Match held props and hand placement to drinking, music, and crafting poses",
+        "Review reproducible close-up action transitions with production rendering settings",
+        "Preserve server authority, deterministic travel, reduced motion, and frame-rate resilience"
+      ]
     }
   ]
 }

@@ -21,6 +21,29 @@ let navigation: Awaited<ReturnType<typeof createNavigation>>;
 beforeAll(async () => {
   navigation = await createNavigation();
 });
+it('detours around two stationary travelers after crafting and reaches the stage', () => {
+  const world = createWorld(0);
+  world.directorEnabled = false;
+  world.musicNext = 120000;
+  for (const npc of world.inhabitants) npc.nextDecision = 120000;
+  world.inhabitants[1].position = [0, -2.5];
+  world.inhabitants[2].position = [5, 1];
+  const pip = world.inhabitants[10];
+  pip.position = [3.5, 1.5];
+  pip.nextDecision = 10000;
+  pip.energy = 95;
+  pip.thirst = 0;
+  pip.socialNeed = 0;
+  pip.creativity = 1;
+  for (let now = 250; now <= 50000; now += 250) {
+    tickWorld(world, now, navigation);
+    for (const blocker of [world.inhabitants[2], world.inhabitants[9]])
+      expect(distance(pip.position, blocker.position)).toBeGreaterThanOrEqual(0.45);
+  }
+  expect(pip.instrument).toBe('lute');
+  expect(pip.plan?.phase).toBe('performing');
+  expect(pip.action).toBe('play_music');
+});
 function fixture() {
   const world = createWorld(0);
   world.directorEnabled = false;

@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import {
   createWorld,
   tickWorld,
+  SEAT_DEPARTURE_DURATION,
   executeAction,
   offerOpportunity,
   respondToOpportunity,
@@ -9,7 +10,7 @@ import {
   executeIntent,
 } from '../packages/simulation/engine';
 import { createNavigation } from '../packages/navigation/recast';
-import { isWalkable, distance } from '../packages/shared/layout';
+import { isWalkable, distance, seats, isTravelSegmentClear, chairClearance } from '../packages/shared/layout';
 import { actions, publicWorld } from '../packages/shared/world';
 let navigation: Awaited<ReturnType<typeof createNavigation>>;
 beforeAll(async () => {
@@ -17,6 +18,72 @@ beforeAll(async () => {
 });
 
 describe('authoritative simulation', () => {
+  it('holds a seated traveler still until the standing transition can complete', () => {
+    const world = createWorld(0);
+    world.directorEnabled = false;
+    const traveler = world.inhabitants[8];
+    world.inhabitants = [traveler];
+    traveler.position = [...seats[0]];
+    traveler.action = 'rest';
+    traveler.energy = 100;
+    traveler.nextDecision = 0;
+    tickWorld(world, 250, navigation);
+    expect(traveler.plan?.phase).toBe('walking');
+    expect(traveler.plan?.departAt).toBe(250 + SEAT_DEPARTURE_DURATION);
+    tickWorld(world, 1000, navigation);
+    expect(traveler.position).toEqual(seats[0]);
+    tickWorld(world, 2500, navigation);
+    expect(distance(traveler.position, seats[0])).toBeGreaterThan(0.01);
+  });
+  it('routes every chair to its exact clear seating point', () => {
+    for (const seat of seats) {
+      const path = navigation.path([-8, 0], seat);
+      expect(isWalkable(seat, 0.42)).toBe(true);
+      expect(path.length).toBeGreaterThan(0);
+      expect(distance(path.at(-1)!, seat)).toBeLessThan(0.01);
+      let previous: [number, number] = [-8, 0];
+      for (const point of path) {
+        expect(isTravelSegmentClear(previous, point, seat)).toBe(true);
+        previous = point;
+      }
+      expect(navigation.path(seat, [-8, 0]).length).toBeGreaterThan(0);
+      expect(navigation.path([seat[0] + 0.003, seat[1] - 0.015], [-8, 0]).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('routes ordinary travel around empty chairs and rejects shortcuts through them', () => {
+    const start: [number, number] = [-2, 5.2],
+      end: [number, number] = [2, 5.2];
+    expect(isTravelSegmentClear(start, end)).toBe(false);
+    const path = navigation.path(start, end);
+    expect(path.length).toBeGreaterThan(1);
+    let previous = start;
+    for (const point of path) {
+      expect(isTravelSegmentClear(previous, point)).toBe(true);
+      previous = point;
+    }
+    expect(distance(previous, end)).toBeLessThan(0.01);
+    const world = createWorld(0);
+    const walker = world.inhabitants[8];
+    world.inhabitants = [walker];
+    world.directorEnabled = false;
+    walker.position = start;
+    walker.nextDecision = 1e9;
+    walker.plan = {
+      id: 'stale-route',
+      action: 'wander',
+      destination: end,
+      path: [end],
+      phase: 'walking',
+      until: 0,
+      applied: false,
+    };
+    for (let now = 1000; now <= 8000; now += 1000) {
+      tickWorld(world, now, navigation);
+      expect(seats.every((seat) => distance(seat, walker.position) >= chairClearance)).toBe(true);
+    }
+  });
+
   it('creates stable identities and advances headlessly', () => {
     const world = createWorld(1000),
       ids = world.inhabitants.map((n) => n.id);
@@ -155,9 +222,9 @@ describe('authoritative simulation', () => {
     expect(executeAction(w, npc.id, 'drink', 'command:2')).toBe(false);
   });
   it('finds a path around a table instead of walking through it', () => {
-    const route = navigation.path([-4.5, 0], [-0.8, 0]);
+    const route = navigation.path([-4.9, -0.8], [-0.3, -0.8]);
     expect(route.length).toBeGreaterThan(1);
-    let previous: [number, number] = [-4.5, 0];
+    let previous: [number, number] = [-4.9, -0.8];
     for (const point of route) {
       const steps = Math.ceil(distance(previous, point) / 0.1);
       for (let i = 0; i <= steps; i++)

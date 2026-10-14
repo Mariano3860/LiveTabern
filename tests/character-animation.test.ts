@@ -1,8 +1,45 @@
 import { describe, expect, it } from 'vitest';
 import { actions } from '../packages/shared/world';
 import { animationByAction, characterAnimationFor } from '../apps/web/character-animation';
+import { usesChairPose } from '../packages/shared/layout';
 
 describe('tavern animation catalogue', () => {
+  it('uses lowered resting hands for idle and the end of serving', () => {
+    expect(usesChairPose('chat')).toBe(true);
+    expect(usesChairPose('trade')).toBe(true);
+    expect(
+      characterAnimationFor({
+        action: 'chat',
+        moving: false,
+        sitting: true,
+        serving: false,
+        wasSitting: true,
+        variant: 3,
+      }).clip,
+    ).toBe('Sitting_Talking_Loop');
+    for (let variant = 1; variant <= 15; variant++) {
+      expect(
+        characterAnimationFor({
+          action: 'wander',
+          moving: false,
+          sitting: false,
+          serving: false,
+          wasSitting: false,
+          variant,
+        }).clip,
+      ).toBe('Idle_Loop');
+    }
+    expect(
+      characterAnimationFor({
+        action: 'wander',
+        moving: false,
+        sitting: false,
+        serving: true,
+        wasSitting: false,
+        variant: 1,
+      }).after,
+    ).toBe('Idle_Loop');
+  });
   it('has a real clip for every enabled NPC action', () => {
     expect(Object.keys(animationByAction).sort()).toEqual([...actions].sort());
     expect(Object.values(animationByAction)).toContain('Consume');
@@ -62,7 +99,7 @@ describe('tavern animation catalogue', () => {
     });
     expect(drink).toMatchObject({
       clip: 'Consume',
-      after: 'Idle_Torch_Loop',
+      after: 'Idle_Loop',
       repeat: 'Consume',
       loop: false,
     });

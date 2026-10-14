@@ -27,6 +27,8 @@ export interface Plan {
   until: number;
   applied: boolean;
   blockedSince?: number;
+  departAt?: number;
+  detourAttempted?: boolean;
 }
 export interface Inhabitant {
   id: string;
