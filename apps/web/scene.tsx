@@ -24,8 +24,11 @@ import type { AnimationAction } from 'three';
 import type { OrbitControls as Controls } from 'three-stdlib';
 import { characterAnimationFor, type CharacterAnimationPlan } from './character-animation';
 import { initialChairMotion, stepChairMotion } from './chair-motion';
-import { alignSeatClip } from './seat-animation';
+import { alignSeatClip, standingSeatClip } from './seat-animation';
 import { bindHeadClip } from './head-clipping';
+import { locomotionBlend } from './locomotion';
+import { stepMotionSpring } from './motion-spring';
+import type { RefObject } from 'react';
 import type { PublicInhabitant, PublicWorld } from '../../packages/shared/world';
 import { benches, distance, seats, tables } from '../../packages/shared/layout';
 
@@ -160,6 +163,8 @@ export function Chair({
 }) {
   const chair = useRef<Group>(null),
     motion = useRef(initialChairMotion);
+  const slide = useRef({ value: 0, velocity: 0 });
+  const occupant = useRef<string | null>(null);
   const nearest = tables.reduce((best, table) =>
     distance([x, z], table) < distance([x, z], best) ? table : best,
   );
@@ -169,6 +174,7 @@ export function Chair({
     if (reduced) {
       motion.current = initialChairMotion;
       chair.current.position.z = 0;
+      slide.current = { value: 0, velocity: 0 };
       return;
     }
     let guest: PublicInhabitant | undefined,
@@ -177,17 +183,24 @@ export function Chair({
     for (const npc of world.inhabitants) {
       if (npc.id === 'npc-1' || npc.action !== 'rest') continue;
       const gap = distance(seat, npc.position);
-      const relevant = (npc.phase === 'walking' && gap < 1.15) || (npc.phase === 'performing' && gap < 0.45);
+      const relevant =
+        (npc.phase === 'walking' && gap < 1.15 && distance(npc.target, seat) < 0.05) ||
+        (npc.phase !== 'walking' && gap < 0.45);
       if (relevant && gap < nearest) {
         guest = npc;
         nearest = gap;
       }
     }
     const activity =
-      guest?.phase === 'performing' ? 'seated' : guest?.phase === 'walking' ? 'approaching' : 'none';
-    const next = stepChairMotion(motion.current, activity, Math.min(dt, 0.05));
+      guest && guest.phase !== 'walking' ? 'seated' : guest?.phase === 'walking' ? 'approaching' : 'none';
+    if (activity === 'seated' && guest) occupant.current = guest.id;
+    const departing = world.inhabitants.find((npc) => npc.id === occupant.current);
+    const departureNear = activity === 'none' && departing && distance(departing.position, seat) < 0.7;
+    if (activity === 'none' && departing && !departureNear) occupant.current = null;
+    const next = stepChairMotion(motion.current, departureNear ? 'departing' : activity, Math.min(dt, 0.25));
     motion.current = next.state;
-    chair.current.position.z += (next.offset - chair.current.position.z) * (1 - Math.exp(-dt * 9));
+    stepMotionSpring(slide.current, next.offset, 0.24, dt);
+    chair.current.position.z = slide.current.value;
   });
   return (
     <group position={[x, 0, z]} rotation={[0, facing, 0]}>
@@ -538,6 +551,7 @@ export function CharacterModel({
   sitting,
   serving,
   reduced,
+  locomotion,
 }: {
   variant: number;
   npc: PublicInhabitant;
@@ -546,6 +560,7 @@ export function CharacterModel({
   sitting: boolean;
   serving: boolean;
   reduced: boolean;
+  locomotion?: RefObject<{ speed: number; seatReady: boolean }>;
 }) {
   const gender = variant % 2 === 0 ? 'female' : 'male';
   const outfit = variant % 3 === 0 ? 'ranger' : 'peasant';
@@ -585,10 +600,18 @@ export function CharacterModel({
   const active = useRef<{ actions: [AnimationAction, AnimationAction]; plan: CharacterAnimationPlan } | null>(
     null,
   );
+  const walkIdle = useMemo(() => {
+    const clip = library.animations.find((item) => item.name === 'Idle_Loop')!.clone();
+    clip.name = 'Locomotion_Idle';
+    return mixers.map((mixer) => mixer.clipAction(clip));
+  }, [library.animations, mixers]);
+  const idleWeight = useRef(0);
   const repeatCountdown = useRef(0);
   const playPlanRef = useRef<(plan: CharacterAnimationPlan) => void>(() => {});
   const playPlan = useMemo(() => {
     const clips = new Map(library.animations.map((clip) => [clip.name, alignSeatClip(clip)]));
+    const standing = standingSeatClip(library.animations.find((clip) => clip.name === 'Idle_Loop')!);
+    clips.set(standing.name, standing);
     return (plan: CharacterAnimationPlan) => {
       const clip = clips.get(plan.clip);
       if (!clip) return;
@@ -611,7 +634,9 @@ export function CharacterModel({
         animation.play();
       });
       if (current)
-        current.actions.forEach((animation, index) => animation.crossFadeTo(next[index], 0.32, false));
+        current.actions.forEach((animation, index) =>
+          animation.crossFadeTo(next[index], current.plan.clip === 'Sitting_Stand_Idle' ? 0.6 : 0.32, false),
+        );
       else next.forEach((animation) => animation.fadeIn(0.32));
       active.current = { actions: next, plan };
       repeatCountdown.current = plan.repeatDelay ?? 0;
@@ -625,7 +650,7 @@ export function CharacterModel({
       if (current?.actions[0] !== event.action || !current.plan.after) return;
       playPlanRef.current({
         ...current.plan,
-        clip: current.plan.after,
+        clip: current.plan.clip === 'Sitting_Exit' ? 'Sitting_Stand_Idle' : current.plan.after,
         loop: true,
         after: undefined,
       });
@@ -640,6 +665,7 @@ export function CharacterModel({
     mixers.forEach((mixer) => (mixer.timeScale = reduced ? 0.72 : 1));
   }, [mixers, reduced]);
   const wasSitting = useRef(false);
+  const pendingSeat = useRef<CharacterAnimationPlan | null>(null);
   useEffect(() => {
     const plan = characterAnimationFor({
       action: action || 'wander',
@@ -651,10 +677,34 @@ export function CharacterModel({
       instrument: npc.instrument,
     });
     wasSitting.current = sitting;
-    playPlanRef.current(plan);
+    pendingSeat.current = null;
+    if (!moving && !sitting && active.current?.plan.clip === 'Sitting_Stand_Idle') return;
+    if (plan.clip === 'Sitting_Enter' && locomotion) {
+      pendingSeat.current = plan;
+      playPlanRef.current({ mode: 'idle', clip: 'Idle_Loop', loop: true, speed: 1 });
+    } else playPlanRef.current(plan);
   }, [action, moving, sitting, serving, variant, npc.instrument]);
   useFrame(({ clock }, dt) => {
-    const frameDelta = Math.min(dt, 0.05);
+    const frameDelta = Math.min(dt, 0.25);
+    if (active.current?.plan.clip === 'Sitting_Stand_Idle' && (locomotion?.current.speed ?? 0) > 0.12)
+      playPlanRef.current({ mode: 'walking', clip: 'Walk_Loop', loop: true, speed: 1 });
+    if (pendingSeat.current && locomotion?.current.seatReady) {
+      playPlanRef.current(pendingSeat.current);
+      pendingSeat.current = null;
+    }
+    const walking = active.current?.plan.clip === 'Walk_Loop' && locomotion;
+    const motion = locomotionBlend(locomotion?.current.speed ?? 0);
+    idleWeight.current +=
+      ((walking ? 1 - motion.walkWeight : 0) - idleWeight.current) * (1 - Math.exp(-dt * 10));
+    walkIdle.forEach((animation) => {
+      animation.play();
+      animation.setEffectiveWeight(idleWeight.current);
+    });
+    if (walking)
+      active.current?.actions.forEach((animation) => {
+        animation.setEffectiveTimeScale(motion.cadence);
+        animation.setEffectiveWeight(1 - idleWeight.current);
+      });
     mixers[0].update(frameDelta);
     mixers[1].update(frameDelta);
     const current = active.current;
@@ -748,10 +798,12 @@ function Person({
   const initial = useRef<[number, number, number]>([npc.position[0], 0, npc.position[1]]),
     [hover, setHover] = useState(false);
   const variant = Number(npc.id.slice(4)) || 0;
+  const locomotion = useRef({ speed: 0, seatReady: false });
+  const turnSpring = useRef({ value: 0, velocity: 0 });
   const moving = npc.phase === 'walking',
     performing = npc.phase === 'performing';
   const sitting =
-    performing &&
+    !moving &&
     npc.action === 'rest' &&
     npc.id !== 'npc-1' &&
     seats.some((seat) => distance(seat, npc.position) < 0.35);
@@ -763,19 +815,22 @@ function Person({
   useFrame(({ clock }, dt) => {
     if (!group.current || !body.current) return;
     const blend = 1 - Math.exp(-dt * 9);
+    const oldX = group.current.position.x,
+      oldZ = group.current.position.z;
     group.current.position.x += (npc.position[0] - group.current.position.x) * blend;
     group.current.position.z += (npc.position[1] - group.current.position.z) * blend;
+    const dx = group.current.position.x - oldX,
+      dz = group.current.position.z - oldZ;
+    const speed = Math.hypot(dx, dz) / Math.max(dt, 0.001);
+    locomotion.current.speed += (speed - locomotion.current.speed) * (1 - Math.exp(-dt * 8));
     const onStage =
       npc.position[0] > -7.4 && npc.position[0] < -2.6 && npc.position[1] > -5.65 && npc.position[1] < -3.45;
     group.current.position.y +=
       ((onStage ? 0.36 : npc.id === 'npc-1' ? 0.32 : 0.05) - group.current.position.y) * blend;
     let facing = group.current.rotation.y;
-    if (moving)
-      facing = Math.atan2(
-        npc.position[0] - group.current.position.x,
-        npc.position[1] - group.current.position.z,
-      );
-    else if (npc.partnerId) {
+    if (moving) {
+      if (speed > 0.04) facing = Math.atan2(dx, dz);
+    } else if (npc.partnerId) {
       const partner = world.inhabitants.find((n) => n.id === npc.partnerId);
       if (partner)
         facing = Math.atan2(partner.position[0] - npc.position[0], partner.position[1] - npc.position[1]);
@@ -787,11 +842,26 @@ function Person({
     } else if (npc.action === 'play_music') facing = 0.15;
     else if (npc.action === 'craft_instrument')
       facing = Math.atan2(6.2 - npc.position[0], 4.3 - npc.position[1]);
-    group.current.rotation.y +=
-      Math.atan2(Math.sin(facing - group.current.rotation.y), Math.cos(facing - group.current.rotation.y)) *
-      (1 - Math.exp(-dt * 5.5));
+    const turn = Math.atan2(
+      Math.sin(facing - group.current.rotation.y),
+      Math.cos(facing - group.current.rotation.y),
+    );
+    turnSpring.current.value = group.current.rotation.y;
+    stepMotionSpring(turnSpring.current, group.current.rotation.y + turn, 0.38, dt);
+    group.current.rotation.y = turnSpring.current.value;
+    locomotion.current.seatReady =
+      sitting &&
+      Math.abs(turn) < 0.12 &&
+      speed < 0.12 &&
+      Math.hypot(npc.position[0] - group.current.position.x, npc.position[1] - group.current.position.z) <
+        0.08;
     body.current.position.y += (0 - body.current.position.y) * blend;
-    body.current.rotation.set(0, 0, 0);
+    body.current.rotation.x +=
+      ((moving && !reduced ? Math.min(speed, 1.2) * 0.018 : 0) - body.current.rotation.x) * blend;
+    body.current.rotation.z +=
+      ((moving && !reduced ? Math.max(-0.055, Math.min(0.055, -turnSpring.current.velocity * 0.018)) : 0) -
+        body.current.rotation.z) *
+      blend;
     const breathing =
       !reduced && !moving && !performing ? Math.sin(clock.elapsedTime * 1.5 + variant) * 0.003 : 0;
     body.current.scale.y += (1 + breathing - body.current.scale.y) * blend;
@@ -819,6 +889,7 @@ function Person({
           sitting={sitting}
           serving={serving}
           reduced={reduced}
+          locomotion={locomotion}
         />
       </group>
       {(selected || hover) && (

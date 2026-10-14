@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { AnimationMixer, LoopOnce, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { expect, it } from 'vitest';
-import { alignSeatClip } from '../apps/web/seat-animation';
+import { alignSeatClip, standingSeatClip } from '../apps/web/seat-animation';
 import { bindHeadClip } from '../apps/web/head-clipping';
 
 it('places the actual seated pelvis on the seat and keeps the spine clear of the backrest', async () => {
@@ -16,6 +16,18 @@ it('places the actual seated pelvis on the seat and keeps the spine clear of the
   const head = gltf.scene.getObjectByName('Head')!;
   const headClip = bindHeadClip(head);
   const restClearance = headClip.plane.distanceToPoint(head.getWorldPosition(new Vector3()));
+  const standing = standingSeatClip(gltf.animations.find((clip) => clip.name === 'Idle_Loop')!);
+  const standingMixer = new AnimationMixer(gltf.scene);
+  standingMixer.clipAction(standing).play();
+  for (let frame = 0; frame <= 60; frame++) {
+    standingMixer.setTime((standing.duration * frame) / 60);
+    gltf.scene.updateMatrixWorld(true);
+    for (const name of ['foot_l', 'foot_r']) {
+      const foot = gltf.scene.getObjectByName(name)!;
+      expect(foot.getWorldPosition(new Vector3()).z, name).toBeGreaterThan(0.25);
+    }
+  }
+  standingMixer.stopAllAction();
   for (const source of gltf.animations.filter((clip) => clip.name.startsWith('Sitting_'))) {
     const original = Array.from(source.tracks.find((track) => track.name === 'pelvis.position')!.values);
     const mixer = new AnimationMixer(gltf.scene);

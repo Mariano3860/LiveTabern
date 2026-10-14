@@ -19,3 +19,11 @@ Tabletop food, game pieces, fruit, and writing materials are procedural and vary
 ## Tradeoffs
 
 The scene and game-ready character packs remain stylized rather than photorealistic scans, and the downloaded character assets do not provide motion clips; action motion is authored against their shared skeleton. The small optimized set is downloaded once and cached by GLTFLoader, with separate skeleton instances per inhabitant. Dynamic steering uses nearby current positions rather than a crowd planner; congested plans can pause and replan. The low-quality setting remains available for weaker devices.
+
+## Chair clearance and locomotion follow-up
+
+Recast now excludes chair footprints as well as tables and benches. A shared swept-segment predicate validates mesh connectors and authoritative movement, so older persisted paths cannot bypass the new chair obstacles. Access to a chair centre is reserved for its seating destination; an actor already inside a chair clearance may move outward. This is an explicit seat interaction exception, not removal of chairs from the general navigation mesh. The renderer's short chair slide remains visual and fits within the conservative travel footprint.
+
+Steering uses bounded 20 cm substeps with smaller angular alternatives before large detours. Presentation measures confirmed-position interpolation to choose gait cadence and idle/walk weights, and limits turning speed. No client simulation, new physics engine, migration, or runtime dependency is introduced. Full foot planting, anticipatory crowd velocity planning, and coordinated stand-up departure remain outside this incremental change.
+
+Departure timing is canonical: a new travel plan from a resting chair stores an optional `departAt` timestamp and holds its position for 1.8 seconds, including duet journeys. This interval covers the shipped stand-up clip under reduced playback speed and applies with no viewers connected. The snapshot schema accepts the optional timestamp, older snapshots remain readable, and long skipped recovery shifts it along with other active deadlines. Animation and chair motion consume the resulting confirmed pause; neither determines server action effects.

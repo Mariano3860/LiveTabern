@@ -1,6 +1,6 @@
 import { init, NavMeshQuery } from 'recast-navigation';
 import { generateSoloNavMesh } from 'recast-navigation/generators';
-import { distance, isWalkable } from '../shared/layout';
+import { distance, isWalkable, isTravelWalkable, isTravelSegmentClear, seats } from '../shared/layout';
 import type { Point } from '../shared/world';
 import type { Navigation } from '../simulation/engine';
 
@@ -17,7 +17,7 @@ export async function createNavigation(): Promise<Navigation & { dispose(): void
           [x + step, z],
           [x + step, z + step],
           [x, z + step],
-        ].every((p) => isWalkable(p as Point, 0.55))
+        ].every((p) => isWalkable(p as Point, 0.55) && isTravelWalkable(p as Point))
       )
         continue;
       const base = positions.length / 3;
@@ -42,13 +42,14 @@ export async function createNavigation(): Promise<Navigation & { dispose(): void
       const route = query.computePath(
         { x: start[0], y: 0, z: start[1] },
         { x: end[0], y: 0, z: end[1] },
-        { halfExtents: { x: 0.5, y: 1, z: 0.5 } },
+        { halfExtents: { x: 1.2, y: 1, z: 1.2 } },
       );
       if (!route.success || !route.path.length) return [];
       const points = route.path.map((p) => [p.x, p.z] as Point);
       const last = points.at(-1)!,
         remaining = distance(last, end);
-      if (remaining > 0.65 || !isWalkable(end, 0.42)) return [];
+      const assignedSeat = seats.find((seat) => distance(seat, end) < 0.02);
+      if (remaining > 1.2 || !isWalkable(end, 0.42)) return [];
       if (remaining > 0.001) {
         const samples = Math.ceil(remaining / 0.1);
         for (let i = 1; i <= samples; i++) {
@@ -61,7 +62,13 @@ export async function createNavigation(): Promise<Navigation & { dispose(): void
         }
         points.push([...end]);
       }
-      return points.filter((p) => distance(p, start) > 0.05);
+      const routePoints = points.filter((p) => distance(p, start) > 0.05);
+      let previous = start;
+      for (const point of routePoints) {
+        if (!isTravelSegmentClear(previous, point, assignedSeat)) return [];
+        previous = point;
+      }
+      return routePoints;
     },
     dispose() {
       query.destroy();

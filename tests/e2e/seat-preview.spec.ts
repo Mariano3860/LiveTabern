@@ -19,4 +19,14 @@ test('renders a close-up of the calibrated seated character and chair', async ({
   await page.goto('/seat-preview');
   await expect(page.locator('body')).toHaveAttribute('data-ready', 'true', { timeout: 60000 });
   await page.screenshot({ path: 'test-results/seat-closeup.png' });
+  const seatedHeight = Number(await page.locator('body').getAttribute('data-head-height'));
+  await page.getByRole('button', { name: 'pause', exact: true }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-ready', 'true', { timeout: 60000 });
+  expect(Number(await page.locator('body').getAttribute('data-head-height'))).toBeCloseTo(seatedHeight, 1);
+  await page.getByRole('button', { name: 'exit', exact: true }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-ready', 'true', { timeout: 60000 });
+  expect(Number(await page.locator('body').getAttribute('data-head-height'))).toBeGreaterThan(
+    seatedHeight + 0.2,
+  );
+  await page.screenshot({ path: 'test-results/seat-standing.png' });
 });

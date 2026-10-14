@@ -14,7 +14,9 @@ describe('chair seating motion', () => {
     const departure = stepChairMotion(seated.state, 'none', 0.05);
     expect(departure.state.phase).toBe('leaving');
     expect(departure.offset).toBe(-chairPullback);
-    expect(stepChairMotion(departure.state, 'none', 0.35).offset).toBe(0);
-    expect(stepChairMotion(departure.state, 'none', 0.8).state.phase).toBe('idle');
+    expect(stepChairMotion(departure.state, 'departing', 3).offset).toBe(-chairPullback);
+    expect(stepChairMotion(departure.state, 'none', 0.8).offset).toBe(-chairPullback);
+    expect(stepChairMotion(departure.state, 'none', 1.25).offset).toBe(0);
+    expect(stepChairMotion(departure.state, 'none', 1.7).state.phase).toBe('idle');
   });
 });

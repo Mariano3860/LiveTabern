@@ -18,6 +18,7 @@ const plan = z.object({
   until: z.number(),
   applied: z.boolean(),
   blockedSince: z.number().finite().optional(),
+  departAt: z.number().finite().optional(),
 });
 export const eventSchema = z.object({
   id: z.string(),

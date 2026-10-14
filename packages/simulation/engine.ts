@@ -12,11 +12,24 @@ import {
   distance,
   hearthSpots,
   isWalkable,
+  isTravelWalkable,
+  isTravelSegmentClear,
   seats,
   stageSpots,
   workbenchSpot,
 } from '../shared/layout';
 export const CRAFT_DURATION = 12000;
+export const SEAT_DEPARTURE_DURATION = 1800;
+const steeringOffsets = [
+  Math.PI / 12,
+  -Math.PI / 12,
+  Math.PI / 6,
+  -Math.PI / 6,
+  Math.PI / 3,
+  -Math.PI / 3,
+  Math.PI / 2,
+  -Math.PI / 2,
+];
 export interface Navigation {
   path(start: Point, end: Point): Point[];
 }
@@ -426,7 +439,7 @@ function planAction(world: World, npc: Inhabitant, navigation: Navigation) {
         partner.position[0] + Math.cos(angle) * 0.85,
         partner.position[1] + Math.sin(angle) * 0.85,
       ];
-      if (isWalkable(nearby)) {
+      if (isTravelWalkable(nearby)) {
         destination = nearby;
         targetId = partner.id;
         partner.nextDecision = world.time + 15000;
@@ -441,7 +454,7 @@ function planAction(world: World, npc: Inhabitant, navigation: Navigation) {
     action = 'wander';
     for (let i = 0; i < 30; i++) {
       const p: Point = [-8.1 + random(world) * 16.2, -4.8 + random(world) * 12.3];
-      if (isWalkable(p, 0.55)) {
+      if (isWalkable(p, 0.55) && isTravelWalkable(p)) {
         destination = p;
         break;
       }
@@ -457,6 +470,7 @@ function planAction(world: World, npc: Inhabitant, navigation: Navigation) {
     return;
   }
   npc.target = destination;
+  const leavingSeat = npc.action === 'rest' && seats.some((seat) => distance(seat, npc.position) < 0.35);
   npc.action = action;
   npc.plan = {
     id: `command:${++world.commandSequence}`,
@@ -467,6 +481,7 @@ function planAction(world: World, npc: Inhabitant, navigation: Navigation) {
     phase: path.length ? 'walking' : 'performing',
     until: 0,
     applied: false,
+    departAt: leavingSeat && path.length ? world.time + SEAT_DEPARTURE_DURATION : undefined,
   };
 }
 export function inviteDuet(world: World, firstId: string, secondId: string, navigation: Navigation): boolean {
@@ -564,6 +579,7 @@ export function inviteDuet(world: World, firstId: string, secondId: string, navi
   for (const [i, npc] of [first, second].entries()) {
     const command = `command:${++world.commandSequence}`;
     group.commandIds[i] = command;
+    const leavingSeat = npc.action === 'rest' && seats.some((seat) => distance(seat, npc.position) < 0.35);
     npc.action = 'play_music';
     npc.target = [...assignments[i]];
     npc.plan = {
@@ -574,6 +590,7 @@ export function inviteDuet(world: World, firstId: string, secondId: string, navi
       phase: paths[i].length ? 'walking' : 'performing',
       until: 0,
       applied: false,
+      departAt: leavingSeat && paths[i].length ? world.time + SEAT_DEPARTURE_DURATION : undefined,
     };
   }
   emit(world, 'story', members, `${group.name} agree to play a duet and head for the little stage.`);
@@ -780,6 +797,7 @@ export function tickWorld(world: World, now: number, navigation: Navigation): Wo
     }
     if (!plan) continue;
     if (plan.phase === 'walking') {
+      if (plan.departAt && now < plan.departAt) continue;
       let budget = elapsed * (npc.role === 'Apprentice' ? 1.05 : 0.85);
       const previousWaypoint = plan.path[0];
       const previousDistance = previousWaypoint ? distance(npc.position, previousWaypoint) : 0;
@@ -799,10 +817,13 @@ export function tickWorld(world: World, now: number, navigation: Navigation): Wo
           plan.path.shift();
           continue;
         }
-        const step = Math.min(d, budget),
-          heading = Math.atan2(p[1] - npc.position[1], p[0] - npc.position[0]);
+        const step = Math.min(d, budget, 0.2);
         const clear = (candidate: Point) =>
-          isWalkable(candidate, 0.42) &&
+          isTravelSegmentClear(
+            npc.position,
+            candidate,
+            plan.action === 'rest' ? plan.destination : undefined,
+          ) &&
           world.inhabitants.every(
             (other) =>
               other.id === npc.id ||
@@ -811,16 +832,24 @@ export function tickWorld(world: World, now: number, navigation: Navigation): Wo
           );
         // A short local steering step respects both furniture and the current positions of other people.
         // Fixed angle order keeps replay deterministic, including when two people meet head-on.
-        const offsets = [0, Math.PI / 3, -Math.PI / 3, Math.PI / 2, -Math.PI / 2];
-        const next = offsets
-          .map(
-            (angle) =>
-              [
-                npc.position[0] + Math.cos(heading + angle) * step,
-                npc.position[1] + Math.sin(heading + angle) * step,
-              ] as Point,
-          )
-          .find(clear);
+        const direct: Point = [
+          npc.position[0] + ((p[0] - npc.position[0]) * step) / d,
+          npc.position[1] + ((p[1] - npc.position[1]) * step) / d,
+        ];
+        let next: Point | undefined = clear(direct) ? direct : undefined;
+        if (!next) {
+          const heading = Math.atan2(p[1] - npc.position[1], p[0] - npc.position[0]);
+          for (const angle of steeringOffsets) {
+            const candidate: Point = [
+              npc.position[0] + Math.cos(heading + angle) * step,
+              npc.position[1] + Math.sin(heading + angle) * step,
+            ];
+            if (clear(candidate)) {
+              next = candidate;
+              break;
+            }
+          }
+        }
         if (!next) break;
         npc.position = next;
         budget -= step;

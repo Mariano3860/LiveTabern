@@ -13,6 +13,7 @@ export type CharacterAnimationName =
   | 'PickUp_Table'
   | 'Sitting_Enter'
   | 'Sitting_Exit'
+  | 'Sitting_Stand_Idle'
   | 'Sitting_Idle_Loop'
   | 'Sitting_Talking_Loop'
   | 'Walk_Loop'

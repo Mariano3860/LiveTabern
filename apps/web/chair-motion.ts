@@ -1,4 +1,4 @@
-export type ChairActivity = 'approaching' | 'seated' | 'none';
+export type ChairActivity = 'approaching' | 'seated' | 'departing' | 'none';
 export type ChairMotionPhase = 'idle' | 'approaching' | 'seated' | 'leaving';
 
 export interface ChairMotionState {
@@ -8,14 +8,15 @@ export interface ChairMotionState {
 
 export const initialChairMotion: ChairMotionState = { phase: 'idle', elapsed: 0 };
 export const chairPullback = 0.14;
-const leaveDuration = 0.78;
-const leavePullDuration = 0.34;
+const leaveDuration = 1.65;
+const leavePullDuration = 1.2;
 
 export function stepChairMotion(
   state: ChairMotionState,
   activity: ChairActivity,
   delta: number,
 ): { state: ChairMotionState; offset: number } {
+  if (activity === 'departing') return { state: { phase: 'leaving', elapsed: 0 }, offset: -chairPullback };
   if (state.phase === 'leaving') {
     const elapsed = state.elapsed + delta;
     if (elapsed >= leaveDuration) return { state: initialChairMotion, offset: 0 };
