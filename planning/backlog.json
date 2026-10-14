@@ -192,7 +192,7 @@
     {
       "id": "P2-005",
       "title": "Align chair destinations and choreograph sitting and standing",
-      "status": "done",
+      "status": "in_progress",
       "dependencies": ["P2-004"],
       "acceptance": [
         "Route all fifteen seats to their exact points only when the final approach is clear",

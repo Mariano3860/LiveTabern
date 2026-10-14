@@ -25,6 +25,7 @@ import type { AnimationAction } from 'three';
 import type { OrbitControls as Controls } from 'three-stdlib';
 import { characterAnimationFor, type CharacterAnimationPlan } from './character-animation';
 import { initialChairMotion, stepChairMotion } from './chair-motion';
+import { alignSeatClip } from './seat-animation';
 import type { PublicInhabitant, PublicWorld } from '../../packages/shared/world';
 import { benches, distance, seats, tables } from '../../packages/shared/layout';
 
@@ -146,7 +147,17 @@ function Table({ x, z, index }: { x: number; z: number; index: number }) {
     </group>
   );
 }
-function Chair({ x, z, world, reduced }: { x: number; z: number; world: PublicWorld; reduced: boolean }) {
+export function Chair({
+  x,
+  z,
+  world,
+  reduced,
+}: {
+  x: number;
+  z: number;
+  world: PublicWorld;
+  reduced: boolean;
+}) {
   const chair = useRef<Group>(null),
     motion = useRef(initialChairMotion);
   const nearest = tables.reduce((best, table) =>
@@ -519,7 +530,7 @@ function headOnlyGeometry(source: BufferGeometry) {
   headGeometryCache.set(source, geometry);
   return geometry;
 }
-function CharacterModel({
+export function CharacterModel({
   variant,
   npc,
   action,
@@ -576,7 +587,7 @@ function CharacterModel({
   const repeatCountdown = useRef(0);
   const playPlanRef = useRef<(plan: CharacterAnimationPlan) => void>(() => {});
   const playPlan = useMemo(() => {
-    const clips = new Map(library.animations.map((clip) => [clip.name, clip]));
+    const clips = new Map(library.animations.map((clip) => [clip.name, alignSeatClip(clip)]));
     return (plan: CharacterAnimationPlan) => {
       const clip = clips.get(plan.clip);
       if (!clip) return;
