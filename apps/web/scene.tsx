@@ -6,7 +6,6 @@ import {
   BufferGeometry,
   AnimationMixer,
   CylinderGeometry,
-  Plane,
   SphereGeometry,
   MeshStandardMaterial,
   Group,
@@ -26,6 +25,7 @@ import type { OrbitControls as Controls } from 'three-stdlib';
 import { characterAnimationFor, type CharacterAnimationPlan } from './character-animation';
 import { initialChairMotion, stepChairMotion } from './chair-motion';
 import { alignSeatClip } from './seat-animation';
+import { bindHeadClip } from './head-clipping';
 import type { PublicInhabitant, PublicWorld } from '../../packages/shared/world';
 import { benches, distance, seats, tables } from '../../packages/shared/layout';
 
@@ -553,11 +553,12 @@ export function CharacterModel({
   const clothes = useGLTF(`/models/characters/quaternius/${gender}-${outfit}.gltf`);
   const library = useGLTF('/models/characters/quaternius/tavern-actions.glb');
   const modelRoot = useRef<Group>(null);
-  const clippingPlane = useMemo(() => new Plane(new Vector3(0, 1, 0), -1.53), []);
-  const worldPosition = useMemo(() => new Vector3(), []);
   const rigs = useMemo(() => {
     const head = makeCharacterRig(base.scene);
     const outfitRig = makeCharacterRig(clothes.scene);
+    const headBone = head.bones.get('Head');
+    if (!headBone) throw new Error('Character rig is missing its head bone');
+    const headClip = bindHeadClip(headBone);
     const bodyMesh = head.root.getObjectByName(gender === 'male' ? 'SuperHero_Male' : 'Superhero_Female');
     if (bodyMesh && 'isMesh' in bodyMesh && bodyMesh.isMesh) {
       const skinned = bodyMesh as typeof bodyMesh & {
@@ -567,7 +568,7 @@ export function CharacterModel({
       skinned.geometry = headOnlyGeometry(skinned.geometry);
       const clipMaterial = (original: MeshStandardMaterial) => {
         const clone = original.clone();
-        clone.clippingPlanes = [clippingPlane];
+        clone.clippingPlanes = [headClip.plane];
         clone.clipShadows = true;
         return clone;
       };
@@ -575,8 +576,8 @@ export function CharacterModel({
         ? skinned.material.map(clipMaterial)
         : clipMaterial(skinned.material);
     }
-    return [head, outfitRig] as const;
-  }, [base.scene, clothes.scene, clippingPlane, gender]);
+    return [head, outfitRig, headClip] as const;
+  }, [base.scene, clothes.scene, gender]);
   const mixers = useMemo(
     () => [new AnimationMixer(rigs[0].root), new AnimationMixer(rigs[1].root)] as const,
     [rigs],
@@ -673,10 +674,7 @@ export function CharacterModel({
       if (rightHand) rightHand.rotation.x += Math.sin(clock.elapsedTime * 7 + variant) * 0.035;
       if (leftHand) leftHand.rotation.z += Math.sin(clock.elapsedTime * 2.8 + variant) * 0.018;
     }
-    if (modelRoot.current) {
-      modelRoot.current.getWorldPosition(worldPosition);
-      clippingPlane.constant = -(worldPosition.y + 1.53);
-    }
+    rigs[2].update();
   });
 
   const hand = rigs[1].bones.get('hand_r');

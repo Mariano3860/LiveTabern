@@ -20,7 +20,12 @@ export function preview(world: PublicWorld) {
   );
   const facing = Math.atan2(table[0] - x, table[1] - z);
   createRoot(document.getElementById('root')!).render(
-    <Canvas camera={{ position: [3, 1.8, 3], fov: 35 }}>
+    <Canvas
+      camera={{ position: [3, 1.8, 3], fov: 35 }}
+      onCreated={({ gl }) => {
+        gl.localClippingEnabled = true;
+      }}
+    >
       <color attach="background" args={['#ddd5c5']} />
       <ambientLight intensity={2} />
       <directionalLight position={[3, 5, 4]} intensity={3} />
