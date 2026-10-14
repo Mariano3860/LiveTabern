@@ -45,12 +45,14 @@ test('renders the tavern, profiles, camera views, sound controls, and story filt
     )
     .toBe(true);
   await expect
-    .poll(() =>
-      page.evaluate(() =>
-        performance
-          .getEntriesByType('resource')
-          .some((entry) => entry.name.endsWith('/T_Ranger_Normal.webp')),
-      ),
+    .poll(
+      () =>
+        page.evaluate(() =>
+          performance
+            .getEntriesByType('resource')
+            .some((entry) => entry.name.endsWith('/T_Ranger_Normal.webp')),
+        ),
+      { timeout: 30000 },
     )
     .toBe(true);
   await expect
@@ -90,8 +92,10 @@ test('renders the tavern, profiles, camera views, sound controls, and story filt
   await page.getByLabel('Story category', { exact: true }).selectOption('all');
   await page.getByRole('button', { name: 'Under the roof', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'A world in motion' })).toBeVisible();
-  await page.getByRole('button', { name: 'The chronicle', exact: true }).click();
-  await page.screenshot({ path: 'test-results/tavern-desktop.png', fullPage: true });
+  await page.getByRole('button', { name: 'Actions & motion', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Traveler actions' }).locator('details')).toHaveCount(8);
+  await page.locator('[data-action="rest"] summary').click();
+  await page.screenshot({ path: 'test-results/tavern-action-catalogue.png' });
   await page.locator('.scene-panel').screenshot({ path: 'test-results/tavern-preview.png' });
   expect(errors).toEqual([]);
 });

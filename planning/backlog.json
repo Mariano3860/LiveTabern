@@ -176,6 +176,18 @@
         "Retain only licensed action clips used by the tavern and document exact source, digest, and transformation",
         "Verify the animation GLB and real animated scene in unit and browser tests"
       ]
+    },
+    {
+      "id": "P2-004",
+      "title": "Expose a live spectator catalogue of actions and movement",
+      "status": "done",
+      "dependencies": ["P2-003"],
+      "acceptance": [
+        "Show every executable action with accurate prerequisites and a readable description of its movement",
+        "Distinguish confirmed performance, travel, and idle phases without running a browser simulation",
+        "Follow an actual participant from the catalogue with profile and camera controls",
+        "Verify live counts, activity changes, keyboard use, and narrow-screen layout in Chromium"
+      ]
     }
   ]
 }

@@ -781,3 +781,121 @@ footer label {
 .reduce-motion *::after {
   transition-duration: 0.01ms !important;
 }
+
+.action-catalogue {
+  max-height: 525px;
+  overflow-y: auto;
+  scrollbar-color: #85724d #20271d;
+  padding-right: 5px;
+}
+.action-catalogue .quiet {
+  font-size: 11px;
+  line-height: 1.7;
+}
+.action-card {
+  margin: 9px 0;
+  border: 1px solid #48513b;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #2d3325, #232b20);
+}
+.action-card[open] {
+  border-color: #9b8356;
+}
+.action-card summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 11px;
+  cursor: pointer;
+  list-style: none;
+}
+.action-card summary::-webkit-details-marker {
+  display: none;
+}
+.action-card summary::after {
+  content: '+';
+  margin-left: auto;
+  color: #c9b482;
+}
+.action-card[open] summary::after {
+  content: '−';
+}
+.action-card summary:focus-visible {
+  outline: 2px solid #dfbd80;
+  outline-offset: 2px;
+  border-radius: 7px;
+}
+.action-number {
+  font:
+    18px Georgia,
+    serif;
+  color: #bca16d;
+}
+.action-heading strong,
+.action-heading small,
+.action-travelers small {
+  display: block;
+}
+.action-heading strong {
+  font:
+    16px Georgia,
+    serif;
+  color: #eadbb7;
+}
+.action-heading small {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #b0bd9f;
+}
+.action-body {
+  border-top: 1px solid #48513b;
+  padding: 4px 12px 13px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #bdc7ab;
+}
+.action-body dl {
+  margin: 13px 0;
+}
+.action-body dt {
+  color: #dac08c;
+  margin-top: 10px;
+}
+.action-body dd {
+  margin: 3px 0 0;
+}
+.action-travelers {
+  display: grid;
+  gap: 6px;
+}
+.action-travelers button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 9px;
+  border: 1px solid #566045;
+  border-radius: 5px;
+  background: #20281c;
+  color: #e0d9bc;
+  cursor: pointer;
+}
+.action-travelers button > span:last-child {
+  margin-left: auto;
+}
+.action-travelers small {
+  font-size: 9px;
+  color: #a9b893;
+}
+.action-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+@media (max-width: 760px) {
+  .action-catalogue {
+    max-height: 600px;
+  }
+}

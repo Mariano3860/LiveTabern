@@ -1,6 +1,7 @@
 import React, { Component, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useWorld } from './useWorld';
+import { ActionCatalogue } from './ActionCatalogue';
 import { useAmbience } from './audio';
 import type { Category, WorldEvent } from '../../packages/shared/world';
 import './style.css';
@@ -193,6 +194,9 @@ function App() {
             <button aria-pressed={tab === 'world'} onClick={() => setTab('world')}>
               Under the roof
             </button>
+            <button aria-pressed={tab === 'actions'} onClick={() => setTab('actions')}>
+              Actions &amp; motion
+            </button>
           </div>
           {tab === 'chronicle' ? (
             <>
@@ -263,6 +267,15 @@ function App() {
               </button>
               {historyError && <p role="alert">{historyError}</p>}
             </>
+          ) : tab === 'actions' ? (
+            <ActionCatalogue
+              world={world}
+              online={online}
+              follow={(id) => {
+                setSelected(id);
+                setView('follow');
+              }}
+            />
           ) : (
             <>
               <div className="section-title">

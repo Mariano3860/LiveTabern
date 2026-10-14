@@ -1,5 +1,7 @@
 # Character animation catalogue
 
+Open **Actions & motion** in the spectator sidebar to browse all eight supported activities. Each entry explains its prerequisites and visible movement, separates travelers currently performing from those still walking there, and offers **Watch** to open a participant's profile and follow them with the camera. Idle travelers are excluded. Counts come directly from the latest confirmed shared world; after a disconnect, the panel labels them as last confirmed activity until reconnection. Browsing and following never command an inhabitant or change the world.
+
 The browser loads the curated CC0 Quaternius animation file and plays its in-place clips on the existing 65-joint character rigs. The authoritative world still owns action, position, collision avoidance, and arrival. Animation reacts to those confirmed states; it does not move an inhabitant or invent a server action.
 
 | World action or state       | Character performance                                                                                                                                                              |
