@@ -24,6 +24,7 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import type { AnimationAction } from 'three';
 import type { OrbitControls as Controls } from 'three-stdlib';
 import { characterAnimationFor, type CharacterAnimationPlan } from './character-animation';
+import { initialChairMotion, stepChairMotion } from './chair-motion';
 import type { PublicInhabitant, PublicWorld } from '../../packages/shared/world';
 import { benches, distance, seats, tables } from '../../packages/shared/layout';
 
@@ -145,23 +146,52 @@ function Table({ x, z, index }: { x: number; z: number; index: number }) {
     </group>
   );
 }
-function Chair({ x, z }: { x: number; z: number }) {
+function Chair({ x, z, world, reduced }: { x: number; z: number; world: PublicWorld; reduced: boolean }) {
+  const chair = useRef<Group>(null),
+    motion = useRef(initialChairMotion);
   const nearest = tables.reduce((best, table) =>
     distance([x, z], table) < distance([x, z], best) ? table : best,
   );
   const facing = Math.atan2(nearest[0] - x, nearest[1] - z);
+  useFrame((_, dt) => {
+    if (!chair.current) return;
+    if (reduced) {
+      motion.current = initialChairMotion;
+      chair.current.position.z = 0;
+      return;
+    }
+    let guest: PublicInhabitant | undefined,
+      nearest = Infinity;
+    const seat: [number, number] = [x, z];
+    for (const npc of world.inhabitants) {
+      if (npc.id === 'npc-1' || npc.action !== 'rest') continue;
+      const gap = distance(seat, npc.position);
+      const relevant = (npc.phase === 'walking' && gap < 1.15) || (npc.phase === 'performing' && gap < 0.45);
+      if (relevant && gap < nearest) {
+        guest = npc;
+        nearest = gap;
+      }
+    }
+    const activity =
+      guest?.phase === 'performing' ? 'seated' : guest?.phase === 'walking' ? 'approaching' : 'none';
+    const next = stepChairMotion(motion.current, activity, Math.min(dt, 0.05));
+    motion.current = next.state;
+    chair.current.position.z += (next.offset - chair.current.position.z) * (1 - Math.exp(-dt * 9));
+  });
   return (
     <group position={[x, 0, z]} rotation={[0, facing, 0]}>
-      <Round p={[0, 0.46, 0]} s={[0.37, 0.1, 0.35]} c="#865d39" />
-      {[-1, 1].flatMap((a) =>
-        [-1, 1].map((b) => (
-          <Box key={`${a}${b}`} p={[a * 0.23, 0.24, b * 0.2]} s={[0.075, 0.46, 0.075]} c="#5e402b" />
-        )),
-      )}
-      {[-1, 1].map((side) => (
-        <Box key={side} p={[side * 0.23, 0.78, -0.21]} s={[0.08, 0.64, 0.08]} c="#5e402b" />
-      ))}
-      <Box p={[0, 0.85, -0.21]} s={[0.55, 0.3, 0.08]} c="#9d7149" />
+      <group ref={chair}>
+        <Round p={[0, 0.46, 0]} s={[0.37, 0.1, 0.35]} c="#865d39" />
+        {[-1, 1].flatMap((a) =>
+          [-1, 1].map((b) => (
+            <Box key={`${a}${b}`} p={[a * 0.23, 0.24, b * 0.2]} s={[0.075, 0.46, 0.075]} c="#5e402b" />
+          )),
+        )}
+        {[-1, 1].map((side) => (
+          <Box key={side} p={[side * 0.23, 0.78, -0.21]} s={[0.08, 0.64, 0.08]} c="#5e402b" />
+        ))}
+        <Box p={[0, 0.85, -0.21]} s={[0.55, 0.3, 0.08]} c="#9d7149" />
+      </group>
     </group>
   );
 }
@@ -296,7 +326,7 @@ function HerbRack() {
     </group>
   );
 }
-function Tavern({ reduced }: { reduced: boolean }) {
+function Tavern({ reduced, world }: { reduced: boolean; world: PublicWorld }) {
   const wood = useTexture('/textures/oak-planks.webp');
   const stone = useTexture('/textures/lime-stone.webp');
   const floorMap = useMemo(() => {
@@ -416,7 +446,7 @@ function Tavern({ reduced }: { reduced: boolean }) {
         <Table key={x} x={x} z={z} index={index} />
       ))}
       {seats.map(([x, z], i) => (
-        <Chair key={i} x={x} z={z} />
+        <Chair key={i} x={x} z={z} world={world} reduced={reduced} />
       ))}
       <Fire reduced={reduced} />
       <EmberField reduced={reduced} />
@@ -944,7 +974,7 @@ export default function TavernScene({
       />
       <pointLight position={[0, 3.4, -0.8]} color="#ffc379" intensity={14} distance={13} />
       <pointLight position={[4.7, 2, -4.5]} color="#ffc88f" intensity={6} distance={6} />
-      <Tavern reduced={reduced} />
+      <Tavern reduced={reduced} world={world} />
       <Suspense
         fallback={world.inhabitants.map((npc) => (
           <CharacterPlaceholder key={npc.id} npc={npc} />

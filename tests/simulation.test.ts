@@ -9,7 +9,7 @@ import {
   executeIntent,
 } from '../packages/simulation/engine';
 import { createNavigation } from '../packages/navigation/recast';
-import { isWalkable, distance } from '../packages/shared/layout';
+import { isWalkable, distance, seats } from '../packages/shared/layout';
 import { actions, publicWorld } from '../packages/shared/world';
 let navigation: Awaited<ReturnType<typeof createNavigation>>;
 beforeAll(async () => {
@@ -17,6 +17,15 @@ beforeAll(async () => {
 });
 
 describe('authoritative simulation', () => {
+  it('routes every chair to its exact clear seating point', () => {
+    for (const seat of seats) {
+      const path = navigation.path([-8, 0], seat);
+      expect(isWalkable(seat, 0.42)).toBe(true);
+      expect(path.length).toBeGreaterThan(0);
+      expect(distance(path.at(-1)!, seat)).toBeLessThan(0.01);
+    }
+  });
+
   it('creates stable identities and advances headlessly', () => {
     const world = createWorld(1000),
       ids = world.inhabitants.map((n) => n.id);

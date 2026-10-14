@@ -46,7 +46,21 @@ export async function createNavigation(): Promise<Navigation & { dispose(): void
       );
       if (!route.success || !route.path.length) return [];
       const points = route.path.map((p) => [p.x, p.z] as Point);
-      if (distance(points.at(-1)!, end) > 0.65) return [];
+      const last = points.at(-1)!,
+        remaining = distance(last, end);
+      if (remaining > 0.65 || !isWalkable(end, 0.42)) return [];
+      if (remaining > 0.001) {
+        const samples = Math.ceil(remaining / 0.1);
+        for (let i = 1; i <= samples; i++) {
+          const fraction = i / samples;
+          const point: Point = [
+            last[0] + (end[0] - last[0]) * fraction,
+            last[1] + (end[1] - last[1]) * fraction,
+          ];
+          if (!isWalkable(point, 0.42)) return [];
+        }
+        points.push([...end]);
+      }
       return points.filter((p) => distance(p, start) > 0.05);
     },
     dispose() {
