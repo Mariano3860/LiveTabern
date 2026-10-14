@@ -72,7 +72,6 @@ test('renders the tavern, profiles, camera views, sound controls, and story filt
     'aria-pressed',
     'true',
   );
-  await page.locator('.scene-panel').screenshot({ path: 'test-results/tavern-bar-animation.png' });
   expect(
     await page.evaluate(
       () => window.__TAVERN__?.snapshot()?.world.inhabitants.find((n) => n.name === 'Borin')?.position[1],
@@ -96,7 +95,6 @@ test('renders the tavern, profiles, camera views, sound controls, and story filt
   await expect(page.getByRole('region', { name: 'Traveler actions' }).locator('details')).toHaveCount(8);
   await page.locator('[data-action="rest"] summary').click();
   await page.screenshot({ path: 'test-results/tavern-action-catalogue.png' });
-  await page.locator('.scene-panel').screenshot({ path: 'test-results/tavern-preview.png' });
   expect(errors).toEqual([]);
 });
 
