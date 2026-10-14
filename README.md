@@ -17,7 +17,7 @@ Open **http://127.0.0.1:5173**. The frontend uses port 5173 and the world server
 
 No model API keys or paid services are required. External AI is off.
 
-Drag to orbit, scroll to zoom, and select a traveler or their card. Try the fireside and stage cameras, follow a character, filter the chronicle, or read earlier events. Sound is opt-in. Low graphics quality and reduced motion are available.
+Drag to orbit, scroll to zoom, and select a traveler or their card. Try the fireside and stage cameras, follow a character, filter the chronicle, or read earlier events. Sound is opt-in. Low graphics quality and reduced motion are available. Open **Actions & motion** for the activity catalogue, its movement descriptions and prerequisites, live participants, and a shortcut to watch a traveler.
 
 Willing musicians can form a persistent duet, walk to separate places on the stage, and begin a shared performance once both arrive. Watch the performance banner, open a musician's profile, or use **Under the roof** to see their group's history. Duets add a synthesized harmony when sound is enabled.
 

@@ -5,6 +5,8 @@ test('renders the tavern, profiles, camera views, sound controls, and story filt
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
+  // Exercise the full spectator journey with low quality on the software WebGL runner.
+  await page.getByLabel('Quality').selectOption('low');
   await expect(page.locator('.status')).toContainText('Live world');
   await expect(page.locator('.people button')).toHaveCount(15);
   await expect(page.locator('canvas')).toBeVisible();
@@ -45,18 +47,19 @@ test('renders the tavern, profiles, camera views, sound controls, and story filt
     )
     .toBe(true);
   await expect
-    .poll(() =>
-      page.evaluate(() =>
-        performance
-          .getEntriesByType('resource')
-          .some((entry) => entry.name.endsWith('/T_Ranger_Normal.webp')),
-      ),
+    .poll(
+      () =>
+        page.evaluate(() =>
+          performance
+            .getEntriesByType('resource')
+            .some((entry) => entry.name.endsWith('/T_Ranger_Normal.webp')),
+        ),
+      { timeout: 30000 },
     )
     .toBe(true);
   await expect
     .poll(() => page.evaluate(() => window.__TAVERN__?.rendering?.frames ?? 0), { timeout: 20000 })
     .toBeGreaterThanOrEqual(30);
-  await page.getByLabel('Quality').selectOption('low');
   await page.getByRole('button', { name: /Borin/ }).click();
   await expect(page.getByRole('region', { name: "Borin's profile" })).toBeVisible();
   await page.getByRole('button', { name: 'Close profile' }).click();
@@ -70,7 +73,6 @@ test('renders the tavern, profiles, camera views, sound controls, and story filt
     'aria-pressed',
     'true',
   );
-  await page.locator('.scene-panel').screenshot({ path: 'test-results/tavern-bar-animation.png' });
   expect(
     await page.evaluate(
       () => window.__TAVERN__?.snapshot()?.world.inhabitants.find((n) => n.name === 'Borin')?.position[1],
@@ -90,9 +92,10 @@ test('renders the tavern, profiles, camera views, sound controls, and story filt
   await page.getByLabel('Story category', { exact: true }).selectOption('all');
   await page.getByRole('button', { name: 'Under the roof', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'A world in motion' })).toBeVisible();
-  await page.getByRole('button', { name: 'The chronicle', exact: true }).click();
-  await page.screenshot({ path: 'test-results/tavern-desktop.png', fullPage: true });
-  await page.locator('.scene-panel').screenshot({ path: 'test-results/tavern-preview.png' });
+  await page.getByRole('button', { name: 'Actions & motion', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Traveler actions' }).locator('details')).toHaveCount(8);
+  await page.locator('[data-action="rest"] summary').click();
+  await page.screenshot({ path: 'test-results/tavern-action-catalogue.png' });
   expect(errors).toEqual([]);
 });
 
