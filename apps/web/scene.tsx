@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, createPortal, useFrame, useThree } from '@react-three/fiber';
 import { Html, OrbitControls, useGLTF, useTexture } from '@react-three/drei';
 import {
@@ -28,9 +28,12 @@ import { alignSeatClip, standingSeatClip } from './seat-animation';
 import { bindHeadClip } from './head-clipping';
 import { locomotionBlend } from './locomotion';
 import { stepMotionSpring } from './motion-spring';
+import { samplePosition, POSITION_DELAY_MS, type PositionSample } from './position-buffer';
 import type { RefObject } from 'react';
 import type { PublicInhabitant, PublicWorld } from '../../packages/shared/world';
-import { benches, distance, seats, tables } from '../../packages/shared/layout';
+import { benches, distance, seats, tables, usesChairPose } from '../../packages/shared/layout';
+
+useGLTF.preload('/models/characters/quaternius/tavern-actions.glb');
 
 const cube = new BoxGeometry(1, 1, 1),
   cylinder = new CylinderGeometry(1, 1, 1, 14),
@@ -181,10 +184,13 @@ export function Chair({
       nearest = Infinity;
     const seat: [number, number] = [x, z];
     for (const npc of world.inhabitants) {
-      if (npc.id === 'npc-1' || npc.action !== 'rest') continue;
+      if (npc.id === 'npc-1' || !usesChairPose(npc.action)) continue;
       const gap = distance(seat, npc.position);
       const relevant =
-        (npc.phase === 'walking' && gap < 1.15 && distance(npc.target, seat) < 0.05) ||
+        (npc.action === 'rest' &&
+          npc.phase === 'walking' &&
+          gap < 1.15 &&
+          distance(npc.target, seat) < 0.05) ||
         (npc.phase !== 'walking' && gap < 0.45);
       if (relevant && gap < nearest) {
         guest = npc;
@@ -617,11 +623,14 @@ export function CharacterModel({
       if (!clip) return;
       const current = active.current;
       if (
-        current?.plan.mode === plan.mode &&
-        current.plan.clip === plan.clip &&
-        current.plan.loop === plan.loop
-      )
+        current?.plan.clip === plan.clip &&
+        current.plan.loop === plan.loop &&
+        current.actions.every((animation) => animation.isScheduled())
+      ) {
+        current.plan = plan;
+        repeatCountdown.current = plan.repeatDelay ?? 0;
         return;
+      }
       const next = mixers.map((mixer) => mixer.clipAction(clip)) as [AnimationAction, AnimationAction];
       next.forEach((animation) => {
         animation.reset();
@@ -637,14 +646,14 @@ export function CharacterModel({
         current.actions.forEach((animation, index) =>
           animation.crossFadeTo(next[index], current.plan.clip === 'Sitting_Stand_Idle' ? 0.6 : 0.32, false),
         );
-      else next.forEach((animation) => animation.fadeIn(0.32));
       active.current = { actions: next, plan };
       repeatCountdown.current = plan.repeatDelay ?? 0;
+      if (!current) mixers.forEach((mixer) => mixer.update(0));
     };
   }, [library.animations, mixers, variant]);
   playPlanRef.current = playPlan;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const onFinished = (event: { action: AnimationAction }) => {
       const current = active.current;
       if (current?.actions[0] !== event.action || !current.plan.after) return;
@@ -659,6 +668,7 @@ export function CharacterModel({
     return () => {
       mixers[0].removeEventListener('finished', onFinished);
       mixers.forEach((mixer) => mixer.stopAllAction());
+      active.current = null;
     };
   }, [mixers]);
   useEffect(() => {
@@ -666,7 +676,7 @@ export function CharacterModel({
   }, [mixers, reduced]);
   const wasSitting = useRef(false);
   const pendingSeat = useRef<CharacterAnimationPlan | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const plan = characterAnimationFor({
       action: action || 'wander',
       moving,
@@ -708,7 +718,7 @@ export function CharacterModel({
     mixers[0].update(frameDelta);
     mixers[1].update(frameDelta);
     const current = active.current;
-    if (current?.plan.loop && current.plan.repeat && current.plan.clip === 'Idle_Torch_Loop') {
+    if (current?.plan.loop && current.plan.repeat && current.plan.clip === 'Idle_Loop') {
       repeatCountdown.current -= dt;
       if (repeatCountdown.current <= 0)
         playPlanRef.current({
@@ -800,11 +810,18 @@ function Person({
   const variant = Number(npc.id.slice(4)) || 0;
   const locomotion = useRef({ speed: 0, seatReady: false });
   const turnSpring = useRef({ value: 0, velocity: 0 });
+  const positions = useRef<PositionSample[]>([{ time: performance.now(), position: [...npc.position] }]);
+  useEffect(() => {
+    const time = performance.now();
+    if (time - positions.current[positions.current.length - 1].time > 1000) positions.current = [];
+    positions.current.push({ time, position: [...npc.position] });
+    if (positions.current.length > 8) positions.current.shift();
+  }, [world.time, npc.position[0], npc.position[1]]);
   const moving = npc.phase === 'walking',
     performing = npc.phase === 'performing';
   const sitting =
     !moving &&
-    npc.action === 'rest' &&
+    usesChairPose(npc.action) &&
     npc.id !== 'npc-1' &&
     seats.some((seat) => distance(seat, npc.position) < 0.35);
   const serving =
@@ -817,8 +834,9 @@ function Person({
     const blend = 1 - Math.exp(-dt * 9);
     const oldX = group.current.position.x,
       oldZ = group.current.position.z;
-    group.current.position.x += (npc.position[0] - group.current.position.x) * blend;
-    group.current.position.z += (npc.position[1] - group.current.position.z) * blend;
+    const position = samplePosition(positions.current, performance.now() - POSITION_DELAY_MS);
+    group.current.position.x = position[0];
+    group.current.position.z = position[1];
     const dx = group.current.position.x - oldX,
       dz = group.current.position.z - oldZ;
     const speed = Math.hypot(dx, dz) / Math.max(dt, 0.001);
@@ -830,15 +848,15 @@ function Person({
     let facing = group.current.rotation.y;
     if (moving) {
       if (speed > 0.04) facing = Math.atan2(dx, dz);
-    } else if (npc.partnerId) {
-      const partner = world.inhabitants.find((n) => n.id === npc.partnerId);
-      if (partner)
-        facing = Math.atan2(partner.position[0] - npc.position[0], partner.position[1] - npc.position[1]);
     } else if (sitting) {
       const nearest = tables.reduce((best, table) =>
         distance(npc.position, table) < distance(npc.position, best) ? table : best,
       );
       facing = Math.atan2(nearest[0] - npc.position[0], nearest[1] - npc.position[1]);
+    } else if (npc.partnerId) {
+      const partner = world.inhabitants.find((n) => n.id === npc.partnerId);
+      if (partner)
+        facing = Math.atan2(partner.position[0] - npc.position[0], partner.position[1] - npc.position[1]);
     } else if (npc.action === 'play_music') facing = 0.15;
     else if (npc.action === 'craft_instrument')
       facing = Math.atan2(6.2 - npc.position[0], 4.3 - npc.position[1]);

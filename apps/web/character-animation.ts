@@ -58,7 +58,7 @@ export function characterAnimationFor({
   instrument?: 'voice' | 'lute' | 'none';
 }): CharacterAnimationPlan {
   const walkSpeed = 0.82 + (variant % 4) * 0.035;
-  const idle = variant % 3 === 0 ? 'Idle_FoldArms_Loop' : 'Idle_Loop';
+  const idle = 'Idle_Loop';
 
   if (moving)
     return wasSitting
@@ -69,7 +69,7 @@ export function characterAnimationFor({
       mode: 'serving',
       clip: 'PickUp_Table',
       loop: false,
-      after: 'Idle_Torch_Loop',
+      after: 'Idle_Loop',
       speed: 0.86,
     };
   if (sitting) {
@@ -83,7 +83,7 @@ export function characterAnimationFor({
       mode: 'drinking',
       clip: 'Consume',
       loop: false,
-      after: 'Idle_Torch_Loop',
+      after: 'Idle_Loop',
       repeat: 'Consume',
       repeatDelay: 2.35 + (variant % 5) * 0.23,
       speed: 0.84,

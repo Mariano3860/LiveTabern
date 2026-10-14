@@ -19,6 +19,7 @@ const plan = z.object({
   applied: z.boolean(),
   blockedSince: z.number().finite().optional(),
   departAt: z.number().finite().optional(),
+  detourAttempted: z.boolean().optional(),
 });
 export const eventSchema = z.object({
   id: z.string(),

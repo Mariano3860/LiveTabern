@@ -6,6 +6,7 @@ import {
   type World,
   type WorldEvent,
 } from '../shared/world';
+import { crowdDetour } from '../navigation/crowd-detour';
 import {
   barSpots,
   danceSpots,
@@ -14,6 +15,7 @@ import {
   isWalkable,
   isTravelWalkable,
   isTravelSegmentClear,
+  usesChairPose,
   seats,
   stageSpots,
   workbenchSpot,
@@ -470,7 +472,7 @@ function planAction(world: World, npc: Inhabitant, navigation: Navigation) {
     return;
   }
   npc.target = destination;
-  const leavingSeat = npc.action === 'rest' && seats.some((seat) => distance(seat, npc.position) < 0.35);
+  const leavingSeat = usesChairPose(npc.action) && seats.some((seat) => distance(seat, npc.position) < 0.35);
   npc.action = action;
   npc.plan = {
     id: `command:${++world.commandSequence}`,
@@ -579,7 +581,8 @@ export function inviteDuet(world: World, firstId: string, secondId: string, navi
   for (const [i, npc] of [first, second].entries()) {
     const command = `command:${++world.commandSequence}`;
     group.commandIds[i] = command;
-    const leavingSeat = npc.action === 'rest' && seats.some((seat) => distance(seat, npc.position) < 0.35);
+    const leavingSeat =
+      usesChairPose(npc.action) && seats.some((seat) => distance(seat, npc.position) < 0.35);
     npc.action = 'play_music';
     npc.target = [...assignments[i]];
     npc.plan = {
@@ -862,12 +865,32 @@ export function tickWorld(world: World, now: number, navigation: Navigation): Wo
         distance(npc.position, previousWaypoint) >= previousDistance - 0.01
       ) {
         plan.blockedSince ??= now;
-        if (now - plan.blockedSince > 4000) {
+        if (!plan.detourAttempted && now - plan.blockedSince >= 1000) {
+          plan.detourAttempted = true;
+          const blockers = world.inhabitants.filter(
+            (other) => other.id !== npc.id && distance(other.position, npc.position) < 1.3,
+          );
+          const best = crowdDetour(
+            navigation,
+            npc.position,
+            plan.destination,
+            blockers.map((other) => other.position),
+          );
+          if (best.length) {
+            plan.path = best;
+            plan.blockedSince = undefined;
+            plan.detourAttempted = undefined;
+          }
+        }
+        if (plan.blockedSince && now - plan.blockedSince > 4000) {
           npc.plan = null;
           npc.nextDecision = now + 1000;
           continue;
         }
-      } else plan.blockedSince = undefined;
+      } else {
+        plan.blockedSince = undefined;
+        plan.detourAttempted = undefined;
+      }
       if (!plan.path.length) plan.phase = 'performing';
     }
     if (plan.phase === 'performing') {

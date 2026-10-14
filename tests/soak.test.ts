@@ -62,4 +62,5 @@ it('survives seven simulated days with bounded state and conserved resources', (
     expect(day.duets).toBeGreaterThan(0);
   }
   expect(new Set(world.events.map((e) => e.id)).size).toBe(world.events.length);
-}, 120000);
+  // Seven simulated days include crowd detours; retain every invariant on slower workers.
+}, 180000);

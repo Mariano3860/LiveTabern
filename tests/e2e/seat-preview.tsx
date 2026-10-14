@@ -1,4 +1,4 @@
-import { Suspense, useRef, useState } from 'react';
+import { StrictMode, Suspense, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Vector3 } from 'three';
@@ -18,7 +18,11 @@ function Ready() {
 }
 
 export function preview(world: PublicWorld) {
-  createRoot(document.getElementById('root')!).render(<PosePreview world={world} />);
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <PosePreview world={world} />
+    </StrictMode>,
+  );
 }
 
 function PosePreview({ world }: { world: PublicWorld }) {

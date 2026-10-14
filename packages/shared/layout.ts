@@ -1,4 +1,5 @@
-import type { Point } from './world';
+import type { Action, Point } from './world';
+export const usesChairPose = (action: Action) => action === 'rest' || action === 'chat' || action === 'trade';
 export const tables: Point[] = [
   [-2.6, 0],
   [2.4, 0.3],
@@ -85,8 +86,13 @@ export function isTravelSegmentClear(from: Point, to: Point, assignedSeat?: Poin
       continue;
     const sx = from[0] - seat[0],
       sz = from[1] - seat[1];
-    // A seated or restored actor may leave an overlap, but never move deeper into it.
-    if (sx * sx + sz * sz < chairClearance ** 2 && sx * dx + sz * dz >= -0.000001) continue;
+    // Arrival tolerates 4 cm around the anchor; tiny offsets must not trap a seated actor.
+    // Larger overlaps may only escape outward.
+    if (
+      sx * sx + sz * sz < 0.08 ** 2 ||
+      (sx * sx + sz * sz < chairClearance ** 2 && sx * dx + sz * dz >= -0.000001)
+    )
+      continue;
     const t = length > 0 ? Math.max(0, Math.min(1, -(sx * dx + sz * dz) / (length * length))) : 0;
     if ((sx + dx * t) ** 2 + (sz + dz * t) ** 2 < (chairClearance - 0.000001) ** 2) return false;
   }

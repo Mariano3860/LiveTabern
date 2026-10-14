@@ -47,6 +47,7 @@ describe('authoritative simulation', () => {
         previous = point;
       }
       expect(navigation.path(seat, [-8, 0]).length).toBeGreaterThan(0);
+      expect(navigation.path([seat[0] + 0.003, seat[1] - 0.015], [-8, 0]).length).toBeGreaterThan(0);
     }
   });
 
